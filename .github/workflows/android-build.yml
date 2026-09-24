@@ -18,22 +18,28 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android Tools
+      - name: Install Android SDK (Manual Setup)
         run: |
-          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          # 1. Создаем структуру папок для SDK
+          mkdir -p $HOME/Android/Sdk/cmdline-tools
+          
+          # 2. Скачиваем официальные базовые инструменты командной строки Android
+          wget https://google.com -O cmdline.zip
+          unzip cmdline.zip -d $HOME/Android/Sdk/cmdline-tools/
+          mv $HOME/Android/Sdk/cmdline-tools/cmdline-tools $HOME/Android/Sdk/cmdline-tools/latest
+          
+          # 3. Скачиваем нужные платформы через sdkmanager и автоматически принимаем лицензии
+          yes | $HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/Android/Sdk "platform-tools" "build-tools;34.0.0" "platforms;android-34"
 
-      - name: Download Godot & Templates
+      - name: Download Godot Engine & Templates
         run: |
-          # Скачиваем официальный стабильный Godot 4.7.2 для Linux
+          # Скачиваем Godot 4.7.2 Headless
           wget https://github.com
           unzip Godot_v4.7.2-stable_linux.x86_64.zip
           mv Godot_v4.7.2-stable_linux.x86_64 godot
           chmod +x godot
           
-          # Скачиваем и распаковываем официальные шаблоны экспорта
+          # Скачиваем шаблоны экспорта
           wget https://github.com
           unzip Godot_v4.7.2-stable_export_templates.tpz
           mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
@@ -46,6 +52,8 @@ jobs:
       - name: Godot Android Export
         run: |
           mkdir -p build/android
+          # Подменяем путь к SDK и Keystore внутри файла конфигурации на сервере
+          sed -i 's|custom_template/release=.*|custom_template/release=""|g' export_presets.cfg || true
           sed -i 's|keystore/debug=.*|keystore/debug="./debug.keystore"|g' export_presets.cfg || true
           ./godot --headless --export-release "Android" build/android/game.apk
 
