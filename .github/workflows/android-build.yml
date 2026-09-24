@@ -1,0 +1,39 @@
+name: "Android APK Export"
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  export-android:
+    name: Android Export
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Setup Godot
+        uses: chickenesh/setup-godot@v2
+        with:
+          version: 4.7.2-stable
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Create Debug Keystore inside CI
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore ./debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 365
+
+      - name: Prepare Export Directory
+        run: mkdir -p build/android
+
+      - name: Godot Android Export
+        run: |
+          sed -i 's|keystore/debug=.*|keystore/debug="./debug.keystore"|g' export_presets.cfg || true
+          godot --headless --export-release "Android" build/android/game.apk
+
+      - name: Upload APK Artifact
+        uses: actions/artifacts@v4
+        with:
+          name: game-apk
+          path: build/android/game.apk
