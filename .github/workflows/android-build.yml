@@ -9,31 +9,48 @@ jobs:
     name: Android Export
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Setup Godot
-        uses: chickenesh/setup-godot@v2
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          version: 4.7.2-stable
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Debug Keystore inside CI
+      - name: Install Android Tools
+        run: |
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Download Godot & Templates
+        run: |
+          # Скачиваем официальный стабильный Godot 4.7.2 для Linux
+          wget https://github.com
+          unzip Godot_v4.7.2-stable_linux.x86_64.zip
+          mv Godot_v4.7.2-stable_linux.x86_64 godot
+          chmod +x godot
+          
+          # Скачиваем и распаковываем официальные шаблоны экспорта
+          wget https://github.com
+          unzip Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
+          mv templates/* ~/.local/share/godot/export_templates/4.7.2.stable/
+
+      - name: Create Debug Keystore
         run: |
           keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore ./debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 365
 
-      - name: Prepare Export Directory
-        run: mkdir -p build/android
-
       - name: Godot Android Export
         run: |
+          mkdir -p build/android
           sed -i 's|keystore/debug=.*|keystore/debug="./debug.keystore"|g' export_presets.cfg || true
-          godot --headless --export-release "Android" build/android/game.apk
+          ./godot --headless --export-release "Android" build/android/game.apk
 
       - name: Upload APK Artifact
-        uses: actions/artifacts@v4
+        uses: actions/upload-artifact@v4
         with:
           name: game-apk
           path: build/android/game.apk
