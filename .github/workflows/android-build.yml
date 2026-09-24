@@ -32,6 +32,8 @@ jobs:
       # Официальный action: сам скачивает cmdline-tools, ставит ANDROID_HOME и принимает лицензии
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ""   # по умолчанию action ставит устаревший пакет "tools" и падает
 
       - name: Install Android SDK packages
         run: |
