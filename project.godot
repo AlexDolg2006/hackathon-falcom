@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Pet Finni"
-run/main_scene="uid://bh8kc16e7vha1"
+run/main_scene="uid://b1fc1pki38hpl"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
@@ -35,3 +35,4 @@ pointing/emulate_touch_from_mouse=true
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

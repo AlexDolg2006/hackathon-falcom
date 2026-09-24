@@ -24,3 +24,20 @@ func load_game_data() -> void:
 		var parsed = JSON.parse_string(save_file.get_as_text())
 		if parsed is Dictionary:
 			coins = parsed.get("coins", 500)
+			
+			
+# Вызывается при нажатии на кнопку-кликер
+func _on_click_button_pressed() -> void:
+	coins += 10          # Добавляем 10 монет
+	update_ui()          # Обновляем текст на экране
+	save_game_data()     # Сразу сохраняем на телефон
+
+# Вызывается при покупке чего-либо
+func _on_buy_button_pressed() -> void:
+	if coins >= 100:
+		coins -= 100     # Списываем 100 монет за покупку
+		update_ui()
+		save_game_data()
+		print("Успешная покупка!")
+	else:
+		print("Недостаточно монет!")
