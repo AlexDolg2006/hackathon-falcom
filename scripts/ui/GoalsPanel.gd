@@ -95,7 +95,7 @@ func _open_withdraw_dialog() -> void:
 	var dialog := ConfirmationDialog.new()
 	var vb := VBoxContainer.new()
 	var lbl := Label.new()
-	lbl.text = "Сколько монет снять с накоплений? (сейчас: %d)" % GameData.savings
+	lbl.text = "Сколько монет снять с накоплений? (сейчас: %d)\nСнятые монеты попадут в кошелёк — их можно будет распределить заново." % GameData.savings
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vb.add_child(lbl)
 	var spin := SpinBox.new()

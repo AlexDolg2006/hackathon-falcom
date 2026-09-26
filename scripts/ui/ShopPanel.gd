@@ -33,9 +33,12 @@ func _build_ui() -> void:
 
 
 func _refresh() -> void:
-	budget_label.text = "Бюджет обязательного: %d монет   |   Бюджет желаемого: %d монет" % [GameData.mandatory_budget, GameData.optional_budget]
-	if not GameData.period_active:
-		budget_label.text += "\nСначала составь план бюджета на вкладке «Бюджет»."
+	if GameData.period_active:
+		budget_label.text = "План: обяз. %d%% | желаем. %d%% | накопл. %d%%.\nКошельки: обязательное %d монет, желаемое %d монет." % [
+			GameData.plan_pct_mandatory, GameData.plan_pct_optional, GameData.plan_pct_savings,
+			GameData.mandatory_budget, GameData.optional_budget]
+	else:
+		budget_label.text = "Сначала составь план бюджета на вкладке «Бюджет».\nВ кошельке: %d монет." % GameData.wallet
 
 	for child in list_box.get_children():
 		child.queue_free()
@@ -50,7 +53,6 @@ func _refresh() -> void:
 
 	_add_section("Обязательные расходы (еда и уход)", mandatory_items)
 	_add_section("Желаемое (шапки и игрушки)", optional_items)
-
 
 func _add_section(title: String, items: Array) -> void:
 	var header := Label.new()

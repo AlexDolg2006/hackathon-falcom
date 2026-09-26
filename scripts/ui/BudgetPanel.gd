@@ -39,28 +39,37 @@ func _build_ui() -> void:
 	form.add_theme_constant_override("separation", 6)
 	vb.add_child(form)
 
-	form.add_child(_row_title("Обязательное (еда, мыло)"))
+	# Обязательное
+	form.add_child(_row_title("Обязательное — %% от дохода (еда, мыло)"))
 	mandatory_slider = HSlider.new()
 	mandatory_slider.min_value = 0
+	mandatory_slider.max_value = 100
 	mandatory_slider.step = 1
+	mandatory_slider.value = GameData.plan_pct_mandatory
 	mandatory_slider.value_changed.connect(func(_v): _on_slider_changed())
 	form.add_child(mandatory_slider)
 	mandatory_value = Label.new()
 	form.add_child(mandatory_value)
 
-	form.add_child(_row_title("Желаемое (шапки, игрушки)"))
+	# Желаемое
+	form.add_child(_row_title("Желаемое — %% от дохода (шапки, игрушки)"))
 	optional_slider = HSlider.new()
 	optional_slider.min_value = 0
+	optional_slider.max_value = 100
 	optional_slider.step = 1
+	optional_slider.value = GameData.plan_pct_optional
 	optional_slider.value_changed.connect(func(_v): _on_slider_changed())
 	form.add_child(optional_slider)
 	optional_value = Label.new()
 	form.add_child(optional_value)
 
-	form.add_child(_row_title("Накопления (доход %d%% за период)" % int(GameData.SAVINGS_RATE * 100)))
+	# Накопления
+	form.add_child(_row_title("Накопления — %% от дохода (процент %d%% за период)" % int(GameData.SAVINGS_RATE * 100)))
 	savings_slider = HSlider.new()
 	savings_slider.min_value = 0
+	savings_slider.max_value = 100
 	savings_slider.step = 1
+	savings_slider.value = GameData.plan_pct_savings
 	savings_slider.value_changed.connect(func(_v): _on_slider_changed())
 	form.add_child(savings_slider)
 	savings_value = Label.new()
@@ -77,7 +86,7 @@ func _build_ui() -> void:
 	vb.add_child(confirm_button)
 
 	var day_advance := Button.new()
-	day_advance.text = "Завершить текущий день"
+	day_advance.text = "Завершить текущий день (+%d монет)" % GameData.DAILY_INCOME
 	day_advance.custom_minimum_size = Vector2(0, 56)
 	day_advance.pressed.connect(_on_advance_day)
 	vb.add_child(day_advance)
@@ -94,11 +103,14 @@ func _refresh() -> void:
 		c.queue_free()
 
 	if GameData.period_active:
-		wallet_label.text = "Период %d, день %d из %d уже идёт.\nВ кошельке для нового плана: %d монет." % [
-			GameData.period_number, GameData.day_in_period, GameData.PERIOD_LENGTH, GameData.wallet]
-		var s := Label.new()
-		s.text = "Текущий план: обязательное %d | желаемое %d | накопления %d" % [GameData.plan_mandatory, GameData.plan_optional, GameData.plan_savings]
-		status_box.add_child(s)
+		wallet_label.text = "Период %d, день %d из %d.\nТекущие проценты: обяз. %d%%, желаем. %d%%, накопл. %d%%." % [
+			GameData.period_number, GameData.day_in_period, GameData.PERIOD_LENGTH,
+			GameData.plan_pct_mandatory, GameData.plan_pct_optional, GameData.plan_pct_savings]
+		var s1 := Label.new()
+		s1.text = "Кошельки: обязательное %d | желаемое %d | накопления %d | кошелёк %d" % [
+			GameData.mandatory_budget, GameData.optional_budget, GameData.savings, GameData.wallet]
+		s1.autowrap_mode = TextServer.AUTOWRAP_WORD
+		status_box.add_child(s1)
 		var s2 := Label.new()
 		s2.text = "Потрачено по факту: обязательное %d | желаемое %d" % [GameData.fact_mandatory, GameData.fact_optional]
 		status_box.add_child(s2)
@@ -107,59 +119,69 @@ func _refresh() -> void:
 		savings_slider.editable = false
 		confirm_button.disabled = true
 		confirm_button.text = "План уже действует"
+		mandatory_slider.value = GameData.plan_pct_mandatory
+		optional_slider.value = GameData.plan_pct_optional
+		savings_slider.value = GameData.plan_pct_savings
 	else:
-		wallet_label.text = "Доступно для распределения: %d монет.\nРаспредели их по трём направлениям на ближайшие 5 дней." % GameData.wallet
-		mandatory_slider.max_value = GameData.wallet
-		optional_slider.max_value = GameData.wallet
-		savings_slider.max_value = GameData.wallet
+		wallet_label.text = "В кошельке: %d монет.\nЗадай проценты, по которым доход будет делиться между тремя направлениями. Сумма должна быть ровно 100%%." % GameData.wallet
 		mandatory_slider.editable = true
 		optional_slider.editable = true
 		savings_slider.editable = true
 		confirm_button.disabled = false
 		confirm_button.text = "Подтвердить план"
-		if mandatory_slider.value == 0 and optional_slider.value == 0 and savings_slider.value == 0 and GameData.wallet > 0:
-			mandatory_slider.value = int(GameData.wallet * 0.5)
 	_update_values()
 
 
 func _on_slider_changed() -> void:
-	var total := mandatory_slider.value + optional_slider.value + savings_slider.value
-	if total > GameData.wallet:
-		# сжимаем последний изменённый — просто ограничим желаемое и накопления
-		var over := total - GameData.wallet
-		savings_slider.value = max(0, savings_slider.value - over)
-		total = mandatory_slider.value + optional_slider.value + savings_slider.value
-		if total > GameData.wallet:
-			var over2 := total - GameData.wallet
-			optional_slider.value = max(0, optional_slider.value - over2)
+	var m := int(mandatory_slider.value)
+	var o := int(optional_slider.value)
+	var s := int(savings_slider.value)
+	var total := m + o + s
+	if total > 100:
+		var over := total - 100
+		var new_s: int = max(0, s - over)
+		savings_slider.value = new_s
+		s = new_s
+		total = m + o + s
+		if total > 100:
+			var over2 := total - 100
+			optional_slider.value = max(0, o - over2)
 	_update_values()
 
 
 func _update_values() -> void:
-	mandatory_value.text = "%d монет" % int(mandatory_slider.value)
-	optional_value.text = "%d монет" % int(optional_slider.value)
-	savings_value.text = "%d монет" % int(savings_slider.value)
-	var total := int(mandatory_slider.value + optional_slider.value + savings_slider.value)
-	var remaining := GameData.wallet - total
-	remaining_label.text = "Остаток нераспределённых монет: %d" % remaining
+	var m := int(mandatory_slider.value)
+	var o := int(optional_slider.value)
+	var s := int(savings_slider.value)
+	mandatory_value.text = "%d %%" % m
+	optional_value.text = "%d %%" % o
+	savings_value.text = "%d %%" % s
+	var total := m + o + s
+	if total == 100:
+		remaining_label.text = "Сумма: 100 %% — можно подтверждать."
+		if not GameData.period_active:
+			confirm_button.disabled = false
+	else:
+		remaining_label.text = "Сумма: %d %% (нужно ровно 100)" % total
+		if not GameData.period_active:
+			confirm_button.disabled = true
 
 
 func _on_confirm() -> void:
 	var m := int(mandatory_slider.value)
 	var o := int(optional_slider.value)
 	var s := int(savings_slider.value)
-	if m == 0 and o == 0:
+	if m + o + s != 100:
+		_show_message("Проверь проценты", "Сумма процентов должна быть ровно 100.")
+		return
+	if m == 0:
 		_show_message("Подожди", "Обязательное направление стоит заполнить хотя бы немного — иначе не на что будет кормить котика.")
 		return
 	var confirm := ConfirmationDialog.new()
-	confirm.dialog_text = "Подтвердить план на 5 дней?\nОбязательное: %d\nЖелаемое: %d\nНакопления: %d\nПосле подтверждения план нельзя будет изменить до конца периода." % [m, o, s]
+	confirm.dialog_text = "Подтвердить план?\nОбязательное: %d %%\nЖелаемое: %d %%\nНакопления: %d %%\nПлан нельзя менять до конца периода." % [m, o, s]
 	add_child(confirm)
 	confirm.confirmed.connect(func():
-		var ok := GameData.confirm_plan(m, o, s)
-		if ok:
-			mandatory_slider.value = 0
-			optional_slider.value = 0
-			savings_slider.value = 0
+		GameData.confirm_plan(m, o, s)
 	)
 	confirm.popup_centered()
 
@@ -167,9 +189,9 @@ func _on_confirm() -> void:
 func _on_advance_day() -> void:
 	var summary := GameData.advance_day()
 	if summary.is_empty():
-		_show_message("День завершён", "Наступил новый день. Не забудь покормить и помыть котика!")
+		_show_message("День завершён", "Наступил новый день. Пришло %d монет — не забудь покормить и помыть котика!" % GameData.DAILY_INCOME)
 	else:
-		var txt := "Период %d завершён!\n\nПлан: обяз. %d / желаем. %d / накопл. %d\nФакт: обяз. %d / желаем. %d\nПроцент на накопления: +%d монет\n" % [
+		var txt := "Период %d завершён!\n\nПлан (за период): обяз. %d / желаем. %d / накопл. %d\nФакт: обяз. %d / желаем. %d\nПроцент на накопления: +%d монет\n" % [
 			summary.get("period_number"), summary.get("plan_mandatory"), summary.get("plan_optional"), summary.get("plan_savings"),
 			summary.get("fact_mandatory"), summary.get("fact_optional"), summary.get("interest")]
 		if summary.get("grew"):
