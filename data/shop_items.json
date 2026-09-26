@@ -1,0 +1,11 @@
+[
+  {"id":"food_milk","name":"Молоко","category":"mandatory","price":10,"icon":"food","hunger":15,"mood":0,"desc":"Простой перекус, немного насыщает."},
+  {"id":"food_fish","name":"Рыбка","category":"mandatory","price":18,"icon":"food","hunger":30,"mood":2,"desc":"Любимая еда котика, хорошо насыщает."},
+  {"id":"food_chicken","name":"Курочка","category":"mandatory","price":28,"icon":"food","hunger":45,"mood":5,"desc":"Сытный обед надолго."},
+  {"id":"soap_basic","name":"Мыло","category":"mandatory","price":12,"icon":"soap","hunger":0,"mood":10,"desc":"Помыть котика и поднять настроение."},
+  {"id":"soap_shampoo","name":"Шампунь с ромашкой","category":"mandatory","price":22,"icon":"soap","hunger":0,"mood":16,"desc":"Пахнет цветами, котик доволен."},
+  {"id":"hat_bow","name":"Бантик","category":"optional","price":20,"icon":"hat_bow","hunger":0,"mood":8,"desc":"Милый бантик для настроения.","slot":"hat"},
+  {"id":"hat_cap","name":"Кепка","category":"optional","price":35,"icon":"hat_cap","hunger":0,"mood":10,"desc":"Стильная кепка.","slot":"hat"},
+  {"id":"hat_crown","name":"Корона","category":"optional","price":70,"icon":"hat_crown","hunger":0,"mood":18,"desc":"Королевская корона для особого настроения.","slot":"hat"},
+  {"id":"toy_ball","name":"Клубок ниток","category":"optional","price":15,"icon":"toy","hunger":0,"mood":9,"desc":"Игрушка поднимает настроение."}
+]
