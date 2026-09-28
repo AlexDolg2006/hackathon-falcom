@@ -3,15 +3,18 @@ extends Control
 signal go_to_shop
 signal go_to_minigame
 signal go_to_budget
+signal go_to_wash
 
 var mood_bar: ProgressBar
 var hunger_bar: ProgressBar
+var hygiene_bar: ProgressBar
 var name_label: Label
 var stage_label: Label
 var goal_label: Label
 var claim_button: Button
 var feedback_label: Label
 var period_label: Label
+
 
 func _ready() -> void:
 	_build_ui()
@@ -45,14 +48,21 @@ func _build_ui() -> void:
 	var stats_grid := GridContainer.new()
 	stats_grid.columns = 2
 	vb.add_child(stats_grid)
+
 	stats_grid.add_child(_mklabel("Настроение"))
 	mood_bar = ProgressBar.new()
 	mood_bar.max_value = 100
 	stats_grid.add_child(mood_bar)
+
 	stats_grid.add_child(_mklabel("Сытость"))
 	hunger_bar = ProgressBar.new()
 	hunger_bar.max_value = 100
 	stats_grid.add_child(hunger_bar)
+
+	stats_grid.add_child(_mklabel("Гигиена"))
+	hygiene_bar = ProgressBar.new()
+	hygiene_bar.max_value = 100
+	stats_grid.add_child(hygiene_bar)
 
 	goal_label = Label.new()
 	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -79,7 +89,7 @@ func _build_ui() -> void:
 	actions.add_child(claim_button)
 
 	var feed_btn := Button.new()
-	feed_btn.text = "В магазин: покормить/помыть"
+	feed_btn.text = "В магазин"
 	feed_btn.custom_minimum_size = Vector2(0, 60)
 	feed_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	feed_btn.pressed.connect(func(): go_to_shop.emit())
@@ -89,6 +99,13 @@ func _build_ui() -> void:
 	actions2.add_theme_constant_override("separation", 8)
 	vb.add_child(actions2)
 
+	var wash_btn := Button.new()
+	wash_btn.text = "Искупать кота"
+	wash_btn.custom_minimum_size = Vector2(0, 60)
+	wash_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wash_btn.pressed.connect(func(): go_to_wash.emit())
+	actions2.add_child(wash_btn)
+
 	var game_btn := Button.new()
 	game_btn.text = "Мини-игра дня"
 	game_btn.custom_minimum_size = Vector2(0, 60)
@@ -96,12 +113,16 @@ func _build_ui() -> void:
 	game_btn.pressed.connect(func(): go_to_minigame.emit())
 	actions2.add_child(game_btn)
 
+	var actions3 := HBoxContainer.new()
+	actions3.add_theme_constant_override("separation", 8)
+	vb.add_child(actions3)
+
 	var budget_btn := Button.new()
 	budget_btn.text = "План / День"
 	budget_btn.custom_minimum_size = Vector2(0, 60)
 	budget_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	budget_btn.pressed.connect(func(): go_to_budget.emit())
-	actions2.add_child(budget_btn)
+	actions3.add_child(budget_btn)
 
 
 func _mklabel(t: String) -> Label:
@@ -115,6 +136,7 @@ func _refresh() -> void:
 	stage_label.text = "Стадия: %s" % GameData.stage_name()
 	mood_bar.value = GameData.mood
 	hunger_bar.value = GameData.hunger
+	hygiene_bar.value = GameData.hygiene
 
 	var g := GameData.get_goal(GameData.current_goal_id)
 	if not g.is_empty():

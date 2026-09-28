@@ -13,6 +13,8 @@ const PANEL_GOALS := "goals"
 const PANEL_TASKS := "tasks"
 const PANEL_HISTORY := "history"
 const PANEL_ADULT := "adult"
+const PANEL_WASH := "wash"
+
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -101,19 +103,21 @@ func _add_nav_button(nav: HBoxContainer, key: String, text: String) -> void:
 
 func _open_more_menu() -> void:
 	var popup := PopupMenu.new()
-	popup.add_item("Накопления и цели", 0)
-	popup.add_item("Финансовые задания", 1)
-	popup.add_item("Прогресс и справка", 2)
-	popup.add_item("Раздел для взрослого", 3)
+	popup.add_item("Купание кота", 0)
+	popup.add_item("Накопления и цели", 1)
+	popup.add_item("Финансовые задания", 2)
+	popup.add_item("Прогресс и справка", 3)
+	popup.add_item("Раздел для взрослого", 4)
 	add_child(popup)
 	popup.id_pressed.connect(func(id: int):
 		match id:
-			0: _show_panel(PANEL_GOALS)
-			1: _show_panel(PANEL_TASKS)
-			2: _show_panel(PANEL_HISTORY)
-			3: _show_panel(PANEL_ADULT)
+			0: _show_panel(PANEL_WASH)
+			1: _show_panel(PANEL_GOALS)
+			2: _show_panel(PANEL_TASKS)
+			3: _show_panel(PANEL_HISTORY)
+			4: _show_panel(PANEL_ADULT)
 	)
-	popup.popup(Rect2i(get_viewport().get_visible_rect().size.x - 260, 90, 250, 160))
+	popup.popup(Rect2i(get_viewport().get_visible_rect().size.x - 260, 90, 250, 200))
 
 
 func _update_wallet_label() -> void:
@@ -137,6 +141,7 @@ func _show_panel(key: String) -> void:
 			panel.go_to_shop.connect(func(): _show_panel(PANEL_SHOP))
 			panel.go_to_minigame.connect(func(): _show_panel(PANEL_GAME))
 			panel.go_to_budget.connect(func(): _show_panel(PANEL_BUDGET))
+			panel.go_to_wash.connect(func(): _show_panel(PANEL_WASH))
 		PANEL_SHOP:
 			panel = _make(load("res://scripts/ui/ShopPanel.gd"))
 		PANEL_GAME:
@@ -151,6 +156,8 @@ func _show_panel(key: String) -> void:
 			panel = _make(load("res://scripts/ui/HistoryPanel.gd"))
 		PANEL_ADULT:
 			panel = _make(load("res://scripts/ui/AdultPanel.gd"))
+		PANEL_WASH:
+			panel = _make(load("res://scripts/ui/WashPanel.gd"))
 	current_panel = panel
 	_update_wallet_label()
 

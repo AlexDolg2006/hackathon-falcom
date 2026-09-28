@@ -11,6 +11,7 @@ const LOGIN_BONUS := 10
 const SAVINGS_RATE := 0.05
 const MINIGAME_REWARD_PER_COIN := 1
 
+# ---- контент ----
 var shop_items: Array = []
 var tasks: Array = []
 var goals_catalog: Array = []
@@ -23,16 +24,22 @@ var pet_name: String = "Финни"
 var body_color_index: int = 0
 var pattern_index: int = 0
 var equipped_hat: String = ""
+var equipped_wash: String = ""
 var pet_stage: int = 0
 var growth_points: int = 0
 
 var mood: int = 80
 var hunger: int = 80
 
-var wallet: int = 60           # монеты, ждущие распределения
-var mandatory_budget: int = 0  # кошелёк "обязательное"
-var optional_budget: int = 0   # кошелёк "желаемое"
-var savings: int = 0           # накопления
+# ---- гигиена ----
+# 0..100. Растёт от купания, падает со временем.
+# Порог для "грязный" — 40, ниже 20 — кот "очень грязный".
+var hygiene: int = 60
+
+var wallet: int = 60
+var mandatory_budget: int = 0
+var optional_budget: int = 0
+var savings: int = 0
 
 var current_goal_id: String = ""
 
@@ -40,12 +47,10 @@ var period_active: bool = false
 var period_number: int = 1
 var day_in_period: int = 1
 
-# план в процентах
 var plan_pct_mandatory: int = 50
 var plan_pct_optional: int = 30
 var plan_pct_savings: int = 20
 
-# факт за период (в монетах)
 var plan_mandatory: int = 0
 var plan_optional: int = 0
 var plan_savings: int = 0
@@ -107,10 +112,12 @@ func save_game() -> void:
 		"body_color_index": body_color_index,
 		"pattern_index": pattern_index,
 		"equipped_hat": equipped_hat,
+		"equipped_wash": equipped_wash,
 		"pet_stage": pet_stage,
 		"growth_points": growth_points,
 		"mood": mood,
 		"hunger": hunger,
+		"hygiene": hygiene,
 		"wallet": wallet,
 		"mandatory_budget": mandatory_budget,
 		"optional_budget": optional_budget,
@@ -155,10 +162,12 @@ func load_game() -> void:
 	body_color_index = d.get("body_color_index", 0)
 	pattern_index = d.get("pattern_index", 0)
 	equipped_hat = d.get("equipped_hat", "")
+	equipped_wash = d.get("equipped_wash", "")
 	pet_stage = d.get("pet_stage", 0)
 	growth_points = d.get("growth_points", 0)
 	mood = d.get("mood", 80)
 	hunger = d.get("hunger", 80)
+	hygiene = d.get("hygiene", 60)
 	wallet = d.get("wallet", 60)
 	mandatory_budget = d.get("mandatory_budget", 0)
 	optional_budget = d.get("optional_budget", 0)
@@ -192,10 +201,12 @@ func reset_profile(demo: bool = false) -> void:
 	body_color_index = 0
 	pattern_index = 0
 	equipped_hat = ""
+	equipped_wash = ""
 	pet_stage = 0
 	growth_points = 0
 	mood = 80
 	hunger = 80
+	hygiene = 60
 	wallet = 60
 	mandatory_budget = 0
 	optional_budget = 0
@@ -245,8 +256,6 @@ func create_pet(name: String, color_index: int, pattern: int) -> void:
 # ---------------- ВНУТРЕННЕЕ: РАСПРЕДЕЛЕНИЕ ДОХОДА ----------------
 
 func _distribute_income(amount: int) -> void:
-	## Раскидывает amount монет по трём кошелькам согласно процентам плана.
-	## Если план не активен — просто кладёт в wallet.
 	if amount <= 0:
 		return
 	if not period_active:
@@ -313,12 +322,10 @@ func confirm_plan(pct_m: int, pct_o: int, pct_s: int) -> bool:
 	plan_pct_mandatory = pct_m
 	plan_pct_optional = pct_o
 	plan_pct_savings = pct_s
-	# распределяем текущий wallet по новым процентам
 	var start_amount := wallet
 	wallet = 0
 	mandatory_budget = 0
 	optional_budget = 0
-	# savings не трогаем — оно уже накоплено
 	plan_mandatory = 0
 	plan_optional = 0
 	plan_savings = 0
@@ -371,11 +378,19 @@ func buy_item(item_id: String) -> Dictionary:
 	else:
 		optional_budget -= price
 		fact_optional += price
-	hunger = clampi(hunger + int(item.get("hunger", 0)), 0, 100)
-	mood = clampi(mood + int(item.get("mood", 0)), 0, 100)
-	if item.has("slot") and item.get("slot") == "hat":
-		equipped_hat = item_id
-	inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+
+	var slot: String = item.get("slot", "")
+	if slot == "wash":
+		inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+		if equipped_wash == "":
+			equipped_wash = item_id
+	else:
+		hunger = clampi(hunger + int(item.get("hunger", 0)), 0, 100)
+		mood = clampi(mood + int(item.get("mood", 0)), 0, 100)
+		inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+		if slot == "hat":
+			equipped_hat = item_id
+
 	purchase_log.append({"name": item.get("name"), "price": price, "category": cat})
 	toast.emit("Куплено: %s" % item.get("name"))
 	save_game()
@@ -394,6 +409,41 @@ func equip_hat(item_id: String) -> void:
 		equipped_hat = item_id
 		save_game()
 		state_changed.emit()
+
+
+func unequip_wash() -> void:
+	equipped_wash = ""
+	save_game()
+	state_changed.emit()
+
+
+func equip_wash(item_id: String) -> void:
+	if int(inventory.get(item_id, 0)) > 0:
+		equipped_wash = item_id
+		save_game()
+		state_changed.emit()
+
+
+func apply_wash_step(hygiene_gain: int) -> void:
+	## Вызывается из WashPanel при каждом «трении» по коту.
+	## Поднимает гигиену и настроение постепенно.
+	if hygiene_gain <= 0:
+		return
+	hygiene = clampi(hygiene + hygiene_gain, 0, 100)
+	mood = clampi(mood + max(1, hygiene_gain / 4), 0, 100)
+	save_game()
+	state_changed.emit()
+
+
+func hygiene_stage() -> String:
+	if hygiene >= 70:
+		return "Чистый"
+	elif hygiene >= 40:
+		return "Немного грязный"
+	elif hygiene >= 20:
+		return "Грязный"
+	else:
+		return "Очень грязный"
 
 
 # ---------------- НАКОПЛЕНИЯ / ЦЕЛИ ----------------
@@ -441,7 +491,6 @@ func withdraw_savings(amount: int) -> bool:
 	if amount <= 0 or amount > savings:
 		return false
 	savings -= amount
-	# снятые монеты попадают в кошелёк, оттуда их можно распределить заново
 	wallet += amount
 	save_game()
 	state_changed.emit()
@@ -468,16 +517,19 @@ func complete_task(task_id: String, reward: int = 10) -> void:
 
 func advance_day() -> Dictionary:
 	global_day_counter += 1
-
-	# ежедневный доход приходит каждый день
 	_add_income(DAILY_INCOME, "ежедневный доход")
 
-	# естественное снижение показателей
 	hunger = clampi(hunger - 18, 0, 100)
 	var mood_decay := 6
 	if hunger < 30:
 		mood_decay += 8
 	mood = clampi(mood - mood_decay, 0, 100)
+
+	# Гигиена падает со временем: 10 в день + сильнее, если кот голоден
+	var hyg_decay := 10
+	if hunger < 30:
+		hyg_decay += 5
+	hygiene = clampi(hygiene - hyg_decay, 0, 100)
 
 	if not period_active:
 		save_game()
@@ -521,10 +573,10 @@ func _close_period() -> Dictionary:
 		"new_stage": pet_stage,
 		"end_mood": mood,
 		"end_hunger": hunger,
+		"end_hygiene": hygiene,
 	}
 	history.append(summary)
 
-	# неизрасходованные кошельки возвращаются в wallet
 	wallet += mandatory_budget + optional_budget
 	mandatory_budget = 0
 	optional_budget = 0
@@ -533,6 +585,8 @@ func _close_period() -> Dictionary:
 	day_in_period = 1
 	return summary
 
+
+# ---------------- ВСПОМОГАТЕЛЬНОЕ ДЛЯ ОТРИСОВКИ ----------------
 
 func stage_name() -> String:
 	match pet_stage:

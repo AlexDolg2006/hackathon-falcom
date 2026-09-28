@@ -3,6 +3,7 @@ extends Control
 var list_box: VBoxContainer
 var budget_label: Label
 
+
 func _ready() -> void:
 	_build_ui()
 	GameData.state_changed.connect(_refresh)
@@ -21,11 +22,14 @@ func _build_ui() -> void:
 
 	budget_label = Label.new()
 	budget_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	budget_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_child(budget_label)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_child(scroll)
+
 	list_box = VBoxContainer.new()
 	list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list_box.add_theme_constant_override("separation", 10)
@@ -54,6 +58,7 @@ func _refresh() -> void:
 	_add_section("Обязательные расходы (еда и уход)", mandatory_items)
 	_add_section("Желаемое (шапки и игрушки)", optional_items)
 
+
 func _add_section(title: String, items: Array) -> void:
 	var header := Label.new()
 	header.text = title
@@ -65,52 +70,97 @@ func _add_section(title: String, items: Array) -> void:
 
 func _build_item_row(item: Dictionary) -> Control:
 	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 110)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	panel.add_child(margin)
+
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 12)
-	panel.add_child(hb)
+	hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(hb)
 
+	# --- Левая колонка: текстовая информация ---
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info.add_theme_constant_override("separation", 4)
+	hb.add_child(info)
+
 	var name_lbl := Label.new()
 	name_lbl.text = "%s — %d монет" % [item.get("name"), item.get("price")]
 	name_lbl.add_theme_font_size_override("font_size", 18)
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_child(name_lbl)
+
 	var desc_lbl := Label.new()
 	desc_lbl.text = str(item.get("desc", ""))
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	desc_lbl.modulate = Color(1, 1, 1, 0.75)
 	info.add_child(desc_lbl)
+
 	var effect_txt := ""
 	if int(item.get("hunger", 0)) > 0:
 		effect_txt += "Сытость +%d  " % int(item.get("hunger"))
 	if int(item.get("mood", 0)) > 0:
-		effect_txt += "Настроение +%d" % int(item.get("mood"))
-	var effect_lbl := Label.new()
-	effect_lbl.text = effect_txt
-	info.add_child(effect_lbl)
-	hb.add_child(info)
+		effect_txt += "Настроение +%d  " % int(item.get("mood"))
+	if item.get("slot") == "wash":
+		effect_txt += "Ведро с этим средством появится на главном экране"
+	if effect_txt != "":
+		var effect_lbl := Label.new()
+		effect_lbl.text = effect_txt
+		effect_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		effect_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(effect_lbl)
 
-	if item.has("slot") and item.get("slot") == "hat" and int(GameData.inventory.get(item.get("id"), 0)) > 0:
+	var slot: String = item.get("slot", "")
+	var owned: int = int(GameData.inventory.get(item.get("id"), 0))
+	if owned > 0:
 		var owned_lbl := Label.new()
-		owned_lbl.text = "В наличии: %d" % int(GameData.inventory.get(item.get("id")))
+		owned_lbl.text = "В наличии: %d" % owned
+		owned_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		info.add_child(owned_lbl)
+
+	# --- Правая колонка: кнопки ---
+	var buttons := VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 4)
+	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hb.add_child(buttons)
+
+	if slot == "hat" and owned > 0:
 		var wear_btn := Button.new()
 		wear_btn.text = "Надеть" if GameData.equipped_hat != item.get("id") else "Снять"
+		wear_btn.custom_minimum_size = Vector2(140, 40)
 		wear_btn.pressed.connect(func():
 			if GameData.equipped_hat == item.get("id"):
 				GameData.unequip_hat()
 			else:
 				GameData.equip_hat(item.get("id"))
 		)
-		hb.add_child(wear_btn)
+		buttons.add_child(wear_btn)
+
+	if slot == "wash" and owned > 0:
+		var is_active: bool = GameData.equipped_wash == item.get("id")
+		var use_btn := Button.new()
+		use_btn.text = "В ведре ✓" if is_active else "Положить в ведро"
+		use_btn.disabled = is_active
+		use_btn.custom_minimum_size = Vector2(140, 40)
+		use_btn.pressed.connect(func(): GameData.equip_wash(item.get("id")))
+		buttons.add_child(use_btn)
 
 	var buy_btn := Button.new()
 	buy_btn.text = "Купить"
-	buy_btn.custom_minimum_size = Vector2(130, 56)
+	buy_btn.custom_minimum_size = Vector2(140, 48)
 	buy_btn.pressed.connect(func(): _on_buy_pressed(item))
-	hb.add_child(buy_btn)
+	buttons.add_child(buy_btn)
 
-	panel.add_child(hb)
 	return panel
 
 
@@ -120,10 +170,9 @@ func _on_buy_pressed(item: Dictionary) -> void:
 		_show_message("Покупка недоступна", str(check.get("reason")))
 		return
 	var confirm := ConfirmationDialog.new()
-	confirm.dialog_text = "Купить «%s» за %d монет?\nКатегория: %s\nЭффект: сытость +%d, настроение +%d" % [
+	confirm.dialog_text = "Купить «%s» за %d монет?\nКатегория: %s" % [
 		item.get("name"), item.get("price"),
-		("обязательное" if item.get("category") == "mandatory" else "желаемое"),
-		int(item.get("hunger", 0)), int(item.get("mood", 0))
+		("обязательное" if item.get("category") == "mandatory" else "желаемое")
 	]
 	add_child(confirm)
 	confirm.confirmed.connect(func():
