@@ -9,12 +9,34 @@ const BODY_COLORS := [
 ]
 
 var wash_active: bool = false
-var bubbles: Array = []  # каждый: {pos: Vector2, r: float, life: float, max_life: float, phase: float}
+var bubbles: Array = []
+var _redraw_queued: bool = false
 
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(320, 320)
-	GameData.state_changed.connect(func(): queue_redraw())
+	# Подключаемся к сигналу через именованный метод, а не лямбду —
+	# так безопаснее и не создаёт циклических ссылок.
+	if not GameData.state_changed.is_connected(_on_state_changed):
+		GameData.state_changed.connect(_on_state_changed)
+	queue_redraw()
+
+
+func _exit_tree() -> void:
+	if GameData.state_changed.is_connected(_on_state_changed):
+		GameData.state_changed.disconnect(_on_state_changed)
+
+
+func _on_state_changed() -> void:
+	# Защита от повторного вызова, если сигнал прилетит несколько раз за кадр.
+	if _redraw_queued:
+		return
+	_redraw_queued = true
+	call_deferred("_deferred_redraw")
+
+
+func _deferred_redraw() -> void:
+	_redraw_queued = false
 	queue_redraw()
 
 
@@ -50,6 +72,38 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## Возвращает true, если точка в локальных координатах PetCanvas
+## попадает в силуэт кота (тело, голова, уши, хвост).
+func is_point_on_pet(local_pos: Vector2) -> bool:
+	var w := size.x
+	var h := size.y
+	var cx := w * 0.5
+	var cy := h * 0.58
+	var stage: int = GameData.pet_stage
+	var scale_mul := 0.8 + stage * 0.12
+	var body_r := 92.0 * scale_mul
+	var head_r := 78.0 * scale_mul
+	var head_pos := Vector2(cx, cy - head_r * 0.35)
+
+	if _point_in_ellipse(local_pos, Vector2(cx, cy + body_r * 0.35), Vector2(body_r * 0.72, body_r * 0.62)):
+		return true
+	if _point_in_ellipse(local_pos, head_pos, Vector2(head_r * 0.72, head_r * 0.66)):
+		return true
+	if local_pos.distance_to(head_pos + Vector2(-head_r * 0.35, -head_r * 0.6)) < head_r * 0.35:
+		return true
+	if local_pos.distance_to(head_pos + Vector2(head_r * 0.35, -head_r * 0.6)) < head_r * 0.35:
+		return true
+	if local_pos.distance_to(Vector2(cx + body_r * 1.0, cy + body_r * 0.2)) < body_r * 0.35:
+		return true
+	return false
+
+
+func _point_in_ellipse(p: Vector2, center: Vector2, radii: Vector2) -> bool:
+	var dx := (p.x - center.x) / radii.x
+	var dy := (p.y - center.y) / radii.y
+	return dx * dx + dy * dy <= 1.0
+
+
 func _draw() -> void:
 	var w := size.x
 	var h := size.y
@@ -64,19 +118,15 @@ func _draw() -> void:
 	var base_color: Color = BODY_COLORS[GameData.body_color_index % BODY_COLORS.size()]
 	var pattern: int = GameData.pattern_index
 
-	# Слой грязи: чем ниже гигиена, тем темнее кот.
-	var dirt: float = 1.0 - float(GameData.hygiene) / 100.0   # 0..1
+	var dirt: float = 1.0 - float(GameData.hygiene) / 100.0
 	var dirt_color := Color(0.35, 0.28, 0.2, 0.45 * dirt)
 
-	# тень
 	draw_my_ellipse(Vector2(cx, cy + body_r * 0.85), Vector2(body_r * 0.9, body_r * 0.22), Color(0, 0, 0, 0.12))
 
-	# тело
 	draw_my_ellipse(Vector2(cx, cy + body_r * 0.35), Vector2(body_r * 0.72, body_r * 0.62), base_color)
 	if dirt > 0.0:
 		draw_my_ellipse(Vector2(cx, cy + body_r * 0.35), Vector2(body_r * 0.72, body_r * 0.62), dirt_color)
 
-	# хвост
 	var tail_pts := PackedVector2Array([
 		Vector2(cx + body_r * 0.55, cy + body_r * 0.35),
 		Vector2(cx + body_r * 1.25, cy - body_r * 0.05),
@@ -84,17 +134,14 @@ func _draw() -> void:
 	])
 	draw_colored_polygon(tail_pts, base_color)
 
-	# лапки
 	for dx in [-0.35, 0.35]:
 		draw_my_ellipse(Vector2(cx + dx * body_r, cy + body_r * 0.85), Vector2(body_r * 0.18, body_r * 0.16), base_color)
 
-	# голова
 	var head_pos := Vector2(cx, cy - head_r * 0.35)
 	draw_my_ellipse(head_pos, Vector2(head_r * 0.72, head_r * 0.66), base_color)
 	if dirt > 0.0:
 		draw_my_ellipse(head_pos, Vector2(head_r * 0.72, head_r * 0.66), dirt_color)
 
-	# паттерн
 	var pattern_color := base_color.darkened(0.18)
 	if pattern == 1:
 		draw_my_ellipse(head_pos + Vector2(head_r * 0.35, -head_r * 0.2), Vector2(head_r * 0.16, head_r * 0.13), pattern_color)
@@ -104,7 +151,6 @@ func _draw() -> void:
 			var sx := cx - body_r * 0.3 + i * body_r * 0.28
 			draw_rect(Rect2(sx, cy + body_r * 0.05, body_r * 0.12, body_r * 0.55), pattern_color)
 
-	# уши
 	var ear_color := base_color
 	var ear_l := PackedVector2Array([
 		head_pos + Vector2(-head_r * 0.55, -head_r * 0.35),
@@ -121,7 +167,6 @@ func _draw() -> void:
 	draw_colored_polygon(_scale_poly(ear_l, head_pos + Vector2(-head_r*0.2,-head_r*0.5), 0.5), Color(0.95, 0.75, 0.75))
 	draw_colored_polygon(_scale_poly(ear_r, head_pos + Vector2(head_r*0.2,-head_r*0.5), 0.5), Color(0.95, 0.75, 0.75))
 
-	# мордочка
 	var face: String = GameData.mood_face()
 	var eye_off := head_r * 0.28
 	var eye_y := head_pos.y - head_r * 0.05
@@ -148,11 +193,9 @@ func _draw() -> void:
 			draw_line(head_pos + Vector2(sign_*head_r*0.35, mouth_y - head_r*0.15 + yoff*0.3),
 				head_pos + Vector2(sign_*head_r*0.85, mouth_y - head_r*0.25 + yoff*0.25), Color(0,0,0,0.35), 1.5)
 
-	# шапка
 	if GameData.equipped_hat != "" and not wash_active:
 		_draw_hat(GameData.equipped_hat, head_pos, head_r)
 
-	# слой пены/пузырьков при мытье
 	if wash_active:
 		_draw_foam(cx, cy, body_r, head_pos, head_r)
 	for b in bubbles:

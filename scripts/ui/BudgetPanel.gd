@@ -9,6 +9,7 @@ var optional_value: Label
 var savings_value: Label
 var remaining_label: Label
 var confirm_button: Button
+var day_advance: Button
 var status_box: VBoxContainer
 
 func _ready() -> void:
@@ -85,7 +86,7 @@ func _build_ui() -> void:
 	confirm_button.pressed.connect(_on_confirm)
 	vb.add_child(confirm_button)
 
-	var day_advance := Button.new()
+	day_advance = Button.new()
 	day_advance.text = "Завершить текущий день (+%d монет)" % GameData.DAILY_INCOME
 	day_advance.custom_minimum_size = Vector2(0, 56)
 	day_advance.pressed.connect(_on_advance_day)
@@ -119,16 +120,27 @@ func _refresh() -> void:
 		savings_slider.editable = false
 		confirm_button.disabled = true
 		confirm_button.text = "План уже действует"
+		day_advance.disabled = false
+		day_advance.text = "Завершить текущий день (+%d монет)" % GameData.DAILY_INCOME
 		mandatory_slider.value = GameData.plan_pct_mandatory
 		optional_slider.value = GameData.plan_pct_optional
 		savings_slider.value = GameData.plan_pct_savings
 	else:
-		wallet_label.text = "В кошельке: %d монет.\nЗадай проценты, по которым доход будет делиться между тремя направлениями. Сумма должна быть ровно 100%%." % GameData.wallet
+		if GameData.plan_required:
+			wallet_label.text = "Период завершён! Составь новый план на следующие 5 дней.\nВ кошельке: %d монет." % GameData.wallet
+		else:
+			wallet_label.text = "В кошельке: %d монет.\nЗадай проценты, по которым доход будет делиться между тремя направлениями. Сумма должна быть ровно 100%%." % GameData.wallet
 		mandatory_slider.editable = true
 		optional_slider.editable = true
 		savings_slider.editable = true
 		confirm_button.disabled = false
 		confirm_button.text = "Подтвердить план"
+		# Кнопка "Завершить день" блокируется, пока план не подтверждён.
+		day_advance.disabled = true
+		if GameData.plan_required:
+			day_advance.text = "Сначала подтверди новый план"
+		else:
+			day_advance.text = "Завершить текущий день (+%d монет)" % GameData.DAILY_INCOME
 	_update_values()
 
 
@@ -187,6 +199,9 @@ func _on_confirm() -> void:
 
 
 func _on_advance_day() -> void:
+	if not GameData.can_advance_day():
+		_show_message("Сначала план", "Период завершён — подтверди новый план бюджета, чтобы продолжить.")
+		return
 	var summary := GameData.advance_day()
 	if summary.is_empty():
 		_show_message("День завершён", "Наступил новый день. Пришло %d монет — не забудь покормить и помыть котика!" % GameData.DAILY_INCOME)
@@ -200,6 +215,7 @@ func _on_advance_day() -> void:
 			txt += "\nОтличный период! Котик доволен."
 		else:
 			txt += "\nВ следующий раз попробуй лучше обеспечить обязательное и настроение котика."
+		txt += "\n\nТеперь составь новый план на вкладке «Бюджет»."
 		_show_message("Итоги периода", txt)
 
 

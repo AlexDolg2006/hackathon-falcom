@@ -1,7 +1,8 @@
 extends Control
-## Интерактивное мытьё кота: водишь ведром с мылом/мочалкой по телу кота,
-## гигиена растёт постепенно. Можно мыть сколько угодно раз — просто
-## гигиена восстанавливается до 100 и потом уже не растёт.
+## Интерактивное мытьё кота.
+## Ведро с мылом/мочалкой нужно навести ПРЯМО НА КОТА и водить по нему.
+## Гигиена растёт МЕДЛЕННО, максимум +1 за тик и +X за пиксель пути.
+## Настроение растёт ещё медленнее — примерно +1 за 8–10 тиков.
 
 signal wash_finished
 
@@ -15,16 +16,29 @@ var tool_label: Label
 var dragging := false
 var drag_offset := Vector2.ZERO
 var last_pet_hit := Vector2.ZERO
-
+var touching_pet := false
 var wash_power := 12.0
-var wash_done := false
 
-# Сколько гигиены даёт одно "полное" трение (100% полосы).
-const WASH_FULL_GAIN := 40
-# Насколько близко к коту нужно тереть, чтобы считалось.
-const MIN_RUB_STEP := 0.6
-# Сглаживание: сколько "единиц трения" надо, чтобы получить WASH_FULL_GAIN.
-const RUB_FOR_FULL := 200.0
+# ==== СКОРОСТЬ МЫТЬЯ ====
+# Сколько "единиц трения" надо, чтобы получить +1 гигиены.
+# Чем больше — тем медленнее. Ставь 40-80 для "медленного" мытья.
+const RUB_PER_HYGIENE := 60.0
+# Максимальный прирост гигиены за один кадр.
+const MAX_HYGIENE_PER_FRAME := 1
+# Порог движения в пикселях — меньше не считаем.
+const MIN_RUB_STEP := 1.0
+# Максимальный "шаг" движения за кадр (обрезаем, если мышь пронеслась).
+const MAX_MOVE_PER_FRAME := 8.0
+# Настроение: +1 за каждые N очков гигиены.
+const HYGIENE_PER_MOOD := 8
+
+# Пассивное восстановление гигиены раз в 5 секунд (если не трёшь).
+const PASSIVE_REGEN_INTERVAL := 5.0
+const PASSIVE_REGEN_AMOUNT := 1
+
+var _rub_buffer := 0.0
+var _hygiene_accum := 0  # сколько уже накопили с последнего mood-шага
+var _regen_timer := 0.0
 
 
 func _ready() -> void:
@@ -106,7 +120,7 @@ func _build_ui() -> void:
 	progress_box.add_child(progress_label)
 
 	var hint := Label.new()
-	hint.text = "Перетащи ведро на кота и три его пальцем. Можно возвращаться и мыть снова — гигиена постепенно падает со временем."
+	hint.text = "Наведи ведро ПРЯМО НА КОТА и води по нему — гигиена растёт медленно. Отпустишь — восстановится сама."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.modulate = Color(1, 1, 1, 0.7)
 	vb.add_child(hint)
@@ -154,7 +168,7 @@ func _refresh() -> void:
 		var item: Dictionary = GameData.get_item(wash_id)
 		wash_power = float(item.get("wash_power", 12))
 		tool_label.text = str(item.get("name"))
-		status_label.text = "Средство: %s (сила мытья ×%.0f). Гигиена: %d/100 (%s)." % [
+		status_label.text = "Средство: %s (сила ×%.0f). Гигиена: %d/100 (%s)." % [
 			item.get("name"), wash_power, GameData.hygiene, GameData.hygiene_stage()]
 	_update_progress()
 	bucket_icon.queue_redraw()
@@ -162,6 +176,20 @@ func _refresh() -> void:
 
 func _update_progress() -> void:
 	progress_label.text = "%d%%" % int(GameData.hygiene)
+
+
+func _process(delta: float) -> void:
+	# Пассивное восстановление гигиены, если не трёшь.
+	if dragging or not bucket.visible:
+		return
+	if GameData.hygiene >= 100:
+		return
+	_regen_timer += delta
+	if _regen_timer >= PASSIVE_REGEN_INTERVAL:
+		_regen_timer = 0.0
+		GameData.hygiene = clampi(GameData.hygiene + PASSIVE_REGEN_AMOUNT, 0, 100)
+		GameData.state_changed.emit()
+		_update_progress()
 
 
 func _input(event: InputEvent) -> void:
@@ -174,45 +202,74 @@ func _input(event: InputEvent) -> void:
 			if mb.pressed and bucket.get_global_rect().has_point(mb.position):
 				dragging = true
 				drag_offset = bucket.global_position - mb.position
+				last_pet_hit = Vector2.ZERO
+				_rub_buffer = 0.0
 			elif not mb.pressed:
 				dragging = false
 				last_pet_hit = Vector2.ZERO
+				touching_pet = false
 	elif event is InputEventMouseMotion and dragging:
 		var mm := event as InputEventMouseMotion
 		bucket.global_position = mm.position + drag_offset
-		if pet_canvas.get_global_rect().has_point(mm.position):
-			_rub_at(mm.position)
+		_check_touch()
 
 
-func _rub_at(global_pos: Vector2) -> void:
+func _check_touch() -> void:
+	if not pet_canvas:
+		return
+	var bucket_center: Vector2 = bucket.global_position + bucket.size * 0.5
+	var local: Vector2 = pet_canvas.get_global_transform().affine_inverse() * bucket_center
+	touching_pet = pet_canvas.is_point_on_pet(local)
+	if touching_pet:
+		_rub_at(local)
+	else:
+		# если ведро не на коте — сбрасываем последнюю точку
+		last_pet_hit = Vector2.ZERO
+
+
+func _rub_at(local_pos: Vector2) -> void:
 	if GameData.hygiene >= 100:
-		# Уже чистый — пузырьки можно, но гигиена не растёт.
+		# пузырьки можно, но гигиена не растёт
 		pass
 
-	var local: Vector2 = pet_canvas.get_global_transform().affine_inverse() * global_pos
 	var moved: float = 0.0
 	if last_pet_hit != Vector2.ZERO:
-		moved = local.distance_to(last_pet_hit)
-	last_pet_hit = local
+		moved = local_pos.distance_to(last_pet_hit)
+	last_pet_hit = local_pos
 	if moved < MIN_RUB_STEP:
 		return
+	# Обрезаем резкие движения — иначе мышью можно «пронестись» и получить много.
+	moved = min(moved, MAX_MOVE_PER_FRAME)
 
-	# Пузырёк в точке трения
+	# Пузырёк
 	var r := randf_range(10.0, 18.0)
-	pet_canvas.add_bubble(local, r)
+	pet_canvas.add_bubble(local_pos, r)
 
-	# Начисляем гигиену пропорционально движению и силе средства.
-	var gain_units: float = moved * (wash_power / 12.0)
-	var hygiene_gain: int = int(round(gain_units * (float(WASH_FULL_GAIN) / RUB_FOR_FULL)))
-	if hygiene_gain > 0:
-		GameData.apply_wash_step(hygiene_gain)
+	# Накапливаем "трение"
+	_rub_buffer += moved * (wash_power / 12.0)
+
+	# Превращаем буфер в гигиену
+	var gain := int(floor(_rub_buffer / RUB_PER_HYGIENE))
+	if gain <= 0:
+		return
+	gain = min(gain, MAX_HYGIENE_PER_FRAME)
+	_rub_buffer -= gain * RUB_PER_HYGIENE
+
+	# гигиена
+	GameData.hygiene = clampi(GameData.hygiene + gain, 0, 100)
+	# настроение растёт медленнее — накопительно
+	_hygiene_accum += gain
+	while _hygiene_accum >= HYGIENE_PER_MOOD:
+		_hygiene_accum -= HYGIENE_PER_MOOD
+		GameData.mood = clampi(GameData.mood + 1, 0, 100)
+
+	GameData.state_changed.emit()
 	_update_progress()
 
-	# Обновим текст статуса (там показана гигиена)
 	var wash_id: String = GameData.equipped_wash
 	if wash_id != "":
 		var item: Dictionary = GameData.get_item(wash_id)
-		status_label.text = "Средство: %s (сила мытья ×%.0f). Гигиена: %d/100 (%s)." % [
+		status_label.text = "Средство: %s (сила ×%.0f). Гигиена: %d/100 (%s)." % [
 			item.get("name"), wash_power, GameData.hygiene, GameData.hygiene_stage()]
 
 

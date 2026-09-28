@@ -148,6 +148,8 @@ func _refresh() -> void:
 		period_label.text = "Период %d, день %d из %d. Обязательное: %d, желаемое: %d." % [
 			GameData.period_number, GameData.day_in_period, GameData.PERIOD_LENGTH,
 			GameData.mandatory_budget, GameData.optional_budget]
+	elif GameData.plan_required:
+		period_label.text = "⚠ Период завершён — открой «План / День» и подтверди новый план."
 	else:
 		period_label.text = "Новый период не спланирован. Открой «План / День», чтобы распределить %d монет." % GameData.wallet
 

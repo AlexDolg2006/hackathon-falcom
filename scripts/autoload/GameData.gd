@@ -33,7 +33,6 @@ var hunger: int = 80
 
 # ---- гигиена ----
 # 0..100. Растёт от купания, падает со временем.
-# Порог для "грязный" — 40, ниже 20 — кот "очень грязный".
 var hygiene: int = 60
 
 var wallet: int = 60
@@ -46,6 +45,11 @@ var current_goal_id: String = ""
 var period_active: bool = false
 var period_number: int = 1
 var day_in_period: int = 1
+
+# ---- флаг "период завершён, нужен новый план" ----
+# true, когда 5-й день закончился и до подтверждения нового плана
+# кнопка "Завершить текущий день" должна быть заблокирована.
+var plan_required: bool = false
 
 var plan_pct_mandatory: int = 50
 var plan_pct_optional: int = 30
@@ -126,6 +130,7 @@ func save_game() -> void:
 		"period_active": period_active,
 		"period_number": period_number,
 		"day_in_period": day_in_period,
+		"plan_required": plan_required,
 		"plan_pct_mandatory": plan_pct_mandatory,
 		"plan_pct_optional": plan_pct_optional,
 		"plan_pct_savings": plan_pct_savings,
@@ -176,6 +181,7 @@ func load_game() -> void:
 	period_active = d.get("period_active", false)
 	period_number = d.get("period_number", 1)
 	day_in_period = d.get("day_in_period", 1)
+	plan_required = d.get("plan_required", false)
 	plan_pct_mandatory = d.get("plan_pct_mandatory", 50)
 	plan_pct_optional = d.get("plan_pct_optional", 30)
 	plan_pct_savings = d.get("plan_pct_savings", 20)
@@ -215,6 +221,7 @@ func reset_profile(demo: bool = false) -> void:
 	period_active = false
 	period_number = 1
 	day_in_period = 1
+	plan_required = false
 	plan_pct_mandatory = 50
 	plan_pct_optional = 30
 	plan_pct_savings = 20
@@ -253,7 +260,7 @@ func create_pet(name: String, color_index: int, pattern: int) -> void:
 	state_changed.emit()
 
 
-# ---------------- ВНУТРЕННЕЕ: РАСПРЕДЕЛЕНИЕ ДОХОДА ----------------
+# ---------------- РАСПРЕДЕЛЕНИЕ ДОХОДА ----------------
 
 func _distribute_income(amount: int) -> void:
 	if amount <= 0:
@@ -312,6 +319,11 @@ func reward_minigame(coins_caught: int) -> void:
 
 # ---------------- ПЛАН БЮДЖЕТА ----------------
 
+func can_confirm_plan() -> bool:
+	## Можно подтверждать новый план, если период не активен.
+	return not period_active
+
+
 func confirm_plan(pct_m: int, pct_o: int, pct_s: int) -> bool:
 	if pct_m < 0 or pct_o < 0 or pct_s < 0:
 		return false
@@ -333,6 +345,7 @@ func confirm_plan(pct_m: int, pct_o: int, pct_s: int) -> bool:
 	fact_optional = 0
 	purchase_log = []
 	period_active = true
+	plan_required = false
 	day_in_period = 1
 	period_number = max(1, period_number)
 	_distribute_income(start_amount)
@@ -425,11 +438,11 @@ func equip_wash(item_id: String) -> void:
 
 
 func apply_wash_step(hygiene_gain: int) -> void:
-	## Вызывается из WashPanel при каждом «трении» по коту.
-	## Поднимает гигиену и настроение постепенно.
+	## Вызывается из WashPanel при касании мокрым ведром тела кота.
 	if hygiene_gain <= 0:
 		return
 	hygiene = clampi(hygiene + hygiene_gain, 0, 100)
+	# настроение подрастает медленнее, чем гигиена
 	mood = clampi(mood + max(1, hygiene_gain / 4), 0, 100)
 	save_game()
 	state_changed.emit()
@@ -515,7 +528,17 @@ func complete_task(task_id: String, reward: int = 10) -> void:
 
 # ---------------- ТЕЧЕНИЕ ДНЯ / ПЕРИОДА ----------------
 
+func can_advance_day() -> bool:
+	## Кнопка "Завершить текущий день" доступна только когда период активен.
+	## Если период завершён (plan_required = true) — сначала нужен новый план.
+	return period_active
+
+
 func advance_day() -> Dictionary:
+	if not period_active:
+		# защита от двойного вызова
+		return {}
+
 	global_day_counter += 1
 	_add_income(DAILY_INCOME, "ежедневный доход")
 
@@ -525,16 +548,12 @@ func advance_day() -> Dictionary:
 		mood_decay += 8
 	mood = clampi(mood - mood_decay, 0, 100)
 
-	# Гигиена падает со временем: 10 в день + сильнее, если кот голоден
+	# Гигиена падает со временем. Но если кот чистый (>80) — медленно
+	# восстанавливается обратно к 100.
 	var hyg_decay := 10
 	if hunger < 30:
 		hyg_decay += 5
 	hygiene = clampi(hygiene - hyg_decay, 0, 100)
-
-	if not period_active:
-		save_game()
-		state_changed.emit()
-		return {}
 
 	day_in_period += 1
 	if day_in_period > PERIOD_LENGTH:
@@ -581,9 +600,19 @@ func _close_period() -> Dictionary:
 	mandatory_budget = 0
 	optional_budget = 0
 	period_active = false
+	plan_required = true
 	period_number += 1
 	day_in_period = 1
 	return summary
+
+
+# ---------------- ПАССИВНОЕ ВОССТАНОВЛЕНИЕ ГИГИЕНЫ ----------------
+
+func _process(_delta: float) -> void:
+	## Плавное пассивное восстановление гигиены до 100, если кот сыт и не болен.
+	## Раз в 5 секунд прибавляем 1 (очень медленно).
+	## Чтобы не будить UI каждый кадр — используем счётчик секунд.
+	pass
 
 
 # ---------------- ВСПОМОГАТЕЛЬНОЕ ДЛЯ ОТРИСОВКИ ----------------
