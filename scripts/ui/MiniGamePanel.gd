@@ -214,43 +214,83 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	for c in get_children():
+		c.queue_free()
+
 	var vb := VBoxContainer.new()
 	vb.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vb.add_theme_constant_override("separation", 8)
+	vb.add_theme_constant_override("separation", 10)
 	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(vb)
 
+	# --- 1. Верхняя информационная карточка ---
+	var top_card := PanelContainer.new()
+	var top_style := StyleBoxFlat.new()
+	top_style.bg_color = Color(0.94, 0.94, 0.98)
+	top_style.set_corner_radius_all(16)
+	top_style.content_margin_left = 14
+	top_style.content_margin_right = 14
+	top_style.content_margin_top = 10
+	top_style.content_margin_bottom = 10
+	top_style.shadow_size = 2
+	top_style.shadow_color = Color(0, 0, 0, 0.08)
+	top_card.add_theme_stylebox_override("panel", top_style)
+	vb.add_child(top_card)
+
+	var top_vb := VBoxContainer.new()
+	top_vb.add_theme_constant_override("separation", 4)
+	top_card.add_child(top_vb)
+
 	var title := Label.new()
-	title.text = "Лови монетки"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(title)
+	title.text = "🎮 Лови монетки"
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
+	top_vb.add_child(title)
 
 	status_label = Label.new()
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", 16)
+	status_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.4))
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vb.add_child(status_label)
+	top_vb.add_child(status_label)
 
 	var hud := HBoxContainer.new()
 	hud.add_theme_constant_override("separation", 20)
-	vb.add_child(hud)
+	top_vb.add_child(hud)
+
 	time_label = Label.new()
 	time_label.text = "Время: %.1f" % GAME_TIME
+	time_label.add_theme_font_size_override("font_size", 19)
+	time_label.add_theme_color_override("font_color", Color(0.8, 0.3, 0.2))
 	time_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hud.add_child(time_label)
+
 	score_label = Label.new()
 	score_label.text = "Монеты: 0"
+	score_label.add_theme_font_size_override("font_size", 19)
+	score_label.add_theme_color_override("font_color", Color(0.15, 0.55, 0.25))
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hud.add_child(score_label)
 
-	# Игровая зона
+	# --- 2. Игровая зона в светлой стилистике ---
+	var play_wrap := PanelContainer.new()
+	play_wrap.custom_minimum_size = Vector2(0, 400)
+	play_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	play_wrap.clip_contents = true
+
+	var play_bg := StyleBoxFlat.new()
+	play_bg.bg_color = Color(0.88, 0.90, 0.96)
+	play_bg.set_corner_radius_all(20)
+	play_bg.shadow_size = 2
+	play_bg.shadow_color = Color(0, 0, 0, 0.06)
+	play_wrap.add_theme_stylebox_override("panel", play_bg)
+	vb.add_child(play_wrap)
+
 	play_area = Control.new()
-	play_area.custom_minimum_size = Vector2(0, 400)
-	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	play_area.clip_contents = true
+	play_area.set_anchors_preset(Control.PRESET_FULL_RECT)
 	play_area.mouse_filter = Control.MOUSE_FILTER_PASS
-	vb.add_child(play_area)
+	play_wrap.add_child(play_area)
 
 	# слой монет
 	coins_layer = Control.new()
@@ -265,14 +305,42 @@ func _build_ui() -> void:
 	basket.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_area.add_child(basket)
 
-	start_button = Button.new()
-	start_button.text = "Начать игру"
-	start_button.custom_minimum_size = Vector2(0, 64)
+	# --- 3. Овальная кнопка старта ---
+	start_button = _create_pill_button("Начать игру", Color(0.42, 0.35, 0.82), 60)
 	start_button.pressed.connect(_start_game)
 	vb.add_child(start_button)
 
 	play_area.resized.connect(_on_play_area_resized)
 	call_deferred("_reset_basket_position")
+
+
+func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(0, height)
+	btn.add_theme_font_size_override("font_size", 20)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1))
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.set_corner_radius_all(height / 2)
+	style.shadow_size = 2
+	style.shadow_offset = Vector2(0, 2)
+	style.shadow_color = Color(0, 0, 0, 0.12)
+
+	var style_hover := style.duplicate() as StyleBoxFlat
+	style_hover.bg_color = bg_color.lightened(0.12)
+
+	var style_disabled := style.duplicate() as StyleBoxFlat
+	style_disabled.bg_color = Color(0.7, 0.7, 0.75, 0.7)
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style_hover)
+	btn.add_theme_stylebox_override("focus", style_hover)
+	btn.add_theme_stylebox_override("pressed", style_hover)
+	btn.add_theme_stylebox_override("disabled", style_disabled)
+
+	return btn
 
 
 func _on_play_area_resized() -> void:
@@ -391,11 +459,11 @@ func _end_game() -> void:
 func _input(event: InputEvent) -> void:
 	if not playing:
 		return
-	if event is InputEventMouseMotion:
+	if event is InputEventMouseMotion or event is InputEventScreenDrag:
 		if play_area and basket:
-			var mm := event as InputEventMouseMotion
+			var pos: Vector2 = event.position
 			var xf := play_area.get_global_transform().affine_inverse()
-			var local: Vector2 = xf * mm.position
+			var local: Vector2 = xf * pos
 			basket_target_x = local.x - basket.size.x * 0.5
 	elif event is InputEventKey:
 		var ke := event as InputEventKey
