@@ -105,8 +105,11 @@ func _build_ui() -> void:
 	pet_wrap.add_theme_stylebox_override("panel", pet_style)
 	vb.add_child(pet_wrap)
 
+
+	
+	
 	pet_canvas = Control.new()
-	pet_canvas.set_script(load("res://scripts/ui/PetCanvas.gd"))
+	pet_canvas.set_script(load("res://scripts/ui/CatView.gd"))
 	pet_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pet_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pet_wrap.add_child(pet_canvas)

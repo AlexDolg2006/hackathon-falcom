@@ -22,6 +22,16 @@ func _ready() -> void:
 		GameData.state_changed.connect(_on_state_changed)
 
 
+func is_point_on_pet(local_pos: Vector2) -> bool:
+	# Проверяем, находится ли точка внутри прямоугольника Control-ноды котика
+	return Rect2(Vector2.ZERO, size).has_point(local_pos)
+
+func add_bubble(_local_pos: Vector2, _radius: float = 24.0) -> void:
+	pass # Заглушка, если пузыри не нужны на PNG
+
+func set_wash_state(_active: bool) -> void:
+	pass # Заглушка для совместимости
+
 # Загрузка единой картинки кота из папки скина
 func update_cat_image() -> void:
 	var skin: String = "cat_One"

@@ -173,8 +173,9 @@ func _build_step_pet_creation() -> void:
 
 	# Список ваших папок со скинами в res://assets/
 	var skins_data := [
-		{"name": "Рыжий кот", "folder": "cat_One"},
-		{"name": "Серый кот", "folder": "cat_Two"},
+		{"name": "Сиамский кот", "folder": "cat_One"},
+		{"name": "Черный кот", "folder": "cat_Two"},
+		{"name": "Рыжий кот", "folder": "cat_Three"}
 		# При появлении новых скинов просто добавьте строку:
 		# {"name": "Белый кот", "folder": "cat_Three"}
 	]
