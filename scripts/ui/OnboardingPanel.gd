@@ -134,6 +134,7 @@ func _build_step_welcome() -> void:
 
 
 # --- ШАГ 1: Имя, цвет и узор питомца ---
+# --- ШАГ 1: Имя и выбор скина питомца ---
 func _build_step_pet_creation() -> void:
 	next_button.text = "Далее →"
 
@@ -143,7 +144,7 @@ func _build_step_pet_creation() -> void:
 	var label_name := _create_body("Как будут звать твоего котика?")
 	content_vb.add_child(label_name)
 
-	# Поле ввода имени (исправлены цвета текста для высокой контрастности)
+	# Поле ввода имени[cite: 10]
 	name_input = LineEdit.new()
 	name_input.placeholder_text = "Введи имя (например, Финни)"
 	name_input.text = GameData.pet_name if GameData.pet_name != "" else "Финни"
@@ -151,7 +152,7 @@ func _build_step_pet_creation() -> void:
 	name_input.add_theme_font_size_override("font_size", 40)
 	name_input.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
 	name_input.add_theme_color_override("placeholder_color", Color(0.5, 0.5, 0.6))
-	
+
 	var input_style := StyleBoxFlat.new()
 	input_style.bg_color = Color(0.88, 0.89, 0.95)
 	input_style.set_corner_radius_all(16)
@@ -161,60 +162,40 @@ func _build_step_pet_creation() -> void:
 	name_input.add_theme_stylebox_override("focus", input_style)
 	content_vb.add_child(name_input)
 
-	# Выбор окраса
-	var label_color := _create_body("Выбери цвет:")
-	content_vb.add_child(label_color)
+	# Заголовок выбора внешности
+	var label_skin := _create_body("Выбери внешность:")
+	content_vb.add_child(label_skin)
 
-	var color_hb := HBoxContainer.new()
-	color_hb.add_theme_constant_override("separation", 12)
-	color_hb.alignment = BoxContainer.ALIGNMENT_CENTER
-	content_vb.add_child(color_hb)
+	var skins_hb := HBoxContainer.new()
+	skins_hb.add_theme_constant_override("separation", 12)
+	skins_hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	content_vb.add_child(skins_hb)
 
-	var colors_data := [
-		{"name": "Рыжий", "col": Color(0.95, 0.65, 0.35)},
-		{"name": "Серый", "col": Color(0.55, 0.55, 0.60)},
-		{"name": "Бежевый", "col": Color(0.95, 0.90, 0.80)}
+	# Список ваших папок со скинами в res://assets/
+	var skins_data := [
+		{"name": "Рыжий кот", "folder": "cat_One"},
+		{"name": "Серый кот", "folder": "cat_Two"},
+		# При появлении новых скинов просто добавьте строку:
+		# {"name": "Белый кот", "folder": "cat_Three"}
 	]
 
-	for i in range(colors_data.size()):
-		var c_info: Dictionary = colors_data[i]
-		var btn := _create_pill_button(c_info.get("name"), c_info.get("col"), Color())
-		btn.custom_minimum_size = Vector2(180, 82)
-		btn.add_theme_font_size_override("font_size", 32)
+	for s_info in skins_data:
+		var folder_name: String = s_info.get("folder")
+		var display_name: String = s_info.get("name")
+
+		var btn := _create_pill_button(display_name, Color(0.82, 0.83, 0.90), Color(0.2, 0.2, 0.3))
+		btn.custom_minimum_size = Vector2(200, 70)
+		btn.add_theme_font_size_override("font_size", 28)
+
 		btn.pressed.connect(func():
-			selected_color_index = i
-			GameData.body_color_index = i
+			GameData.selected_skin = folder_name
+			if pet_preview_canvas and pet_preview_canvas.has_method("load_cat_skin"):
+				pet_preview_canvas.load_cat_skin(folder_name)
 			GameData.state_changed.emit()
 		)
-		color_hb.add_child(btn)
+		skins_hb.add_child(btn)
 
-	# Выбор узора (паттерна)
-	var label_pattern := _create_body("Выбери узор:")
-	content_vb.add_child(label_pattern)
-
-	var pattern_hb := HBoxContainer.new()
-	pattern_hb.add_theme_constant_override("separation", 8)
-	pattern_hb.alignment = BoxContainer.ALIGNMENT_CENTER
-	content_vb.add_child(pattern_hb)
-
-	var patterns_data := [
-		{"name": "Однотонный", "id": 0},
-		{"name": "С пятнами", "id": 1},
-		{"name": "Полосатый", "id": 2}
-	]
-
-	for p_info in patterns_data:
-		var p_id: int = p_info.get("id")
-		var btn := _create_pill_button(p_info.get("name"), Color(0.82, 0.83, 0.90), Color(0.2, 0.2, 0.3))
-		btn.custom_minimum_size = Vector2(220, 82)
-		btn.add_theme_font_size_override("font_size", 30)
-		btn.pressed.connect(func():
-			GameData.pattern_index = p_id
-			GameData.state_changed.emit()
-		)
-		pattern_hb.add_child(btn)
-
-	# Превью питомца
+	# Область превью питомца[cite: 10]
 	var preview_wrap := PanelContainer.new()
 	preview_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	preview_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -224,11 +205,18 @@ func _build_step_pet_creation() -> void:
 	preview_wrap.add_theme_stylebox_override("panel", p_style)
 	content_vb.add_child(preview_wrap)
 
+	# Нода CatView для показа выбранного кота[cite: 4, 10]
 	pet_preview_canvas = Control.new()
-	pet_preview_canvas.set_script(load("res://scripts/ui/PetCanvas.gd"))
+	pet_preview_canvas.set_script(load("res://scripts/ui/CatView.gd"))
 	pet_preview_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pet_preview_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pet_preview_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	preview_wrap.add_child(pet_preview_canvas)
 
+	# Показываем текущий сохраненный скин[cite: 4]
+	if pet_preview_canvas.has_method("load_cat_skin"):
+		var current_skin = GameData.selected_skin if "selected_skin" in GameData else "cat_One"
+		pet_preview_canvas.load_cat_skin(current_skin)
 
 # --- ШАГ 2: Как устроена игра ---
 func _build_step_rules() -> void:

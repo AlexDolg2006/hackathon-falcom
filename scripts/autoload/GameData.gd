@@ -17,6 +17,9 @@ var tasks: Array = []
 var goals_catalog: Array = []
 var glossary: Array = []
 
+# Имя папки выбранного скина в res://assets/
+var selected_skin: String = "cat_One"
+
 # ---- профиль ----
 var first_launch: bool = true
 var pet_created: bool = false
@@ -238,6 +241,7 @@ func reset_profile(demo: bool = false) -> void:
 	global_day_counter = 0
 	last_login_day_key = -1
 	is_demo_profile = demo
+	# Имя папки выбранного скина в res://assets/
 	save_game()
 	state_changed.emit()
 

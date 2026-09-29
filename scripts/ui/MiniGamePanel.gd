@@ -1,6 +1,6 @@
 extends Control
-## Мини-игра: лови монетки. Корзина — кот увеличенного размера с шапкой,
-## которого можно двигать пальцем/мышью/стрелками.
+## Мини-игра: лови монетки. Корзина — мордочка выбранного котика,
+## которую можно двигать пальцем/мышью/стрелками.
 ## Монеты — процедурные увеличенные, с бликом и символом.
 
 const GAME_TIME := 20.0
@@ -33,132 +33,45 @@ var key_right := false
 
 
 # ============================================================
-#  МИНИ-КОТ (увеличен до 130x115 px)
+#  МИНИ-ПИТОМЕЦ (Отображает только мордочку выбранного скина)
 # ============================================================
 class MiniPet extends Control:
-	const BODY_COLORS := [
-		Color(0.95, 0.65, 0.35),
-		Color(0.55, 0.55, 0.6),
-		Color(0.97, 0.94, 0.88),
-	]
+	var face_texture: Texture2D
 
 	func _ready() -> void:
-		custom_minimum_size = Vector2(260, 230)
+		custom_minimum_size = Vector2(180, 160)
+		size = Vector2(180, 160)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		
+		if GameData and GameData.has_signal("state_changed"):
+			GameData.state_changed.connect(update_face_texture)
+			
+		update_face_texture()
+
+	func update_face_texture() -> void:
+		var skin: String = "cat_One"
+		if GameData and "selected_skin" in GameData and GameData.selected_skin != "":
+			skin = GameData.selected_skin
+
+		var base_path: String = "res://assets/" + skin + "/"
+		var texture_path: String = ""
+
+		# Приоритет: совмещенное лицо с ушами faceandears.png, иначе face.png
+		if ResourceLoader.exists(base_path + "faceandears.png"):
+			texture_path = base_path + "faceandears.png"
+		elif ResourceLoader.exists(base_path + "face.png"):
+			texture_path = base_path + "face.png"
+
+		if texture_path != "" and ResourceLoader.exists(texture_path):
+			face_texture = load(texture_path)
+		else:
+			face_texture = null
+
+		queue_redraw()
 
 	func _draw() -> void:
-		var w: float = size.x
-		var h: float = size.y
-		var cx := w * 0.5
-		var cy := h * 0.55
-
-		var color_idx: int = GameData.body_color_index % BODY_COLORS.size()
-		var base: Color = BODY_COLORS[color_idx]
-		var pattern: int = GameData.pattern_index
-
-		# тело — овал
-		_draw_ellipse(Vector2(cx, cy + h * 0.18), Vector2(w * 0.36, h * 0.30), base)
-		# голова — овал
-		var head_pos := Vector2(cx, cy - h * 0.05)
-		_draw_ellipse(head_pos, Vector2(w * 0.32, h * 0.28), base)
-
-		# уши — треугольники
-		var ear_l := PackedVector2Array([
-			head_pos + Vector2(-w * 0.24, -h * 0.18),
-			head_pos + Vector2(-w * 0.06, -h * 0.40),
-			head_pos + Vector2(w * 0.02, -h * 0.14),
-		])
-		var ear_r := PackedVector2Array([
-			head_pos + Vector2(w * 0.24, -h * 0.18),
-			head_pos + Vector2(w * 0.06, -h * 0.40),
-			head_pos + Vector2(-w * 0.02, -h * 0.14),
-		])
-		draw_colored_polygon(ear_l, base)
-		draw_colored_polygon(ear_r, base)
-
-		# узор — пятно
-		if pattern == 1:
-			_draw_ellipse(head_pos + Vector2(w * 0.12, -h * 0.06),
-				Vector2(w * 0.08, h * 0.06), base.darkened(0.18))
-		elif pattern == 2:
-			for i in range(2):
-				var sx := head_pos.x - w * 0.18 + i * w * 0.20
-				draw_rect(Rect2(sx, head_pos.y + h * 0.02, w * 0.04, h * 0.16), base.darkened(0.18))
-
-		# глаза
-		draw_circle(head_pos + Vector2(-w * 0.10, -h * 0.02), w * 0.035, Color(0.15, 0.1, 0.1))
-		draw_circle(head_pos + Vector2(w * 0.10, -h * 0.02), w * 0.035, Color(0.15, 0.1, 0.1))
-		draw_circle(head_pos + Vector2(-w * 0.09, -h * 0.03), w * 0.012, Color(1, 1, 1))
-		draw_circle(head_pos + Vector2(w * 0.11, -h * 0.03), w * 0.012, Color(1, 1, 1))
-
-		# нос
-		draw_colored_polygon(PackedVector2Array([
-			head_pos + Vector2(-w * 0.02, h * 0.06),
-			head_pos + Vector2(w * 0.02, h * 0.06),
-			head_pos + Vector2(0, h * 0.10),
-		]), Color(0.85, 0.45, 0.5))
-
-		# рот-«корзина»
-		draw_arc(head_pos + Vector2(0, h * 0.10), w * 0.16,
-			0.15, PI - 0.15, 18, Color(0.35, 0.2, 0.2), 3.0)
-		# лапки
-		draw_circle(Vector2(cx - w * 0.18, h - h * 0.12), w * 0.06, base.darkened(0.05))
-		draw_circle(Vector2(cx + w * 0.18, h - h * 0.12), w * 0.06, base.darkened(0.05))
-
-		# шапка
-		_draw_hat(head_pos, w, h)
-
-	func _draw_hat(head_pos: Vector2, w: float, h: float) -> void:
-		var hat: String = GameData.equipped_hat
-		if hat == "":
-			return
-		match hat:
-			"hat_cap":
-				draw_colored_polygon(PackedVector2Array([
-					head_pos + Vector2(-w * 0.26, -h * 0.22),
-					head_pos + Vector2(w * 0.26, -h * 0.22),
-					head_pos + Vector2(w * 0.20, -h * 0.40),
-					head_pos + Vector2(-w * 0.20, -h * 0.40),
-				]), Color(0.25, 0.45, 0.85))
-				draw_colored_polygon(PackedVector2Array([
-					head_pos + Vector2(w * 0.04, -h * 0.24),
-					head_pos + Vector2(w * 0.36, -h * 0.20),
-					head_pos + Vector2(w * 0.30, -h * 0.14),
-					head_pos + Vector2(w * 0.02, -h * 0.18),
-				]), Color(0.2, 0.35, 0.7))
-			"hat_crown":
-				var by := head_pos.y - h * 0.26
-				var pts := PackedVector2Array([
-					head_pos + Vector2(-w * 0.24, by + h * 0.12),
-					head_pos + Vector2(-w * 0.24, by),
-					head_pos + Vector2(-w * 0.14, by + h * 0.08),
-					head_pos + Vector2(0, by - h * 0.08),
-					head_pos + Vector2(w * 0.14, by + h * 0.08),
-					head_pos + Vector2(w * 0.24, by),
-					head_pos + Vector2(w * 0.24, by + h * 0.12),
-				])
-				draw_colored_polygon(pts, Color(0.95, 0.8, 0.2))
-				draw_circle(head_pos + Vector2(0, by - h * 0.04), w * 0.025, Color(0.8, 0.2, 0.3))
-			"hat_bow":
-				var by2 := head_pos.y - h * 0.32
-				draw_colored_polygon(PackedVector2Array([
-					head_pos + Vector2(-w * 0.14, by2 - h * 0.06),
-					head_pos + Vector2(-w * 0.02, by2),
-					head_pos + Vector2(-w * 0.14, by2 + h * 0.06),
-				]), Color(0.85, 0.3, 0.45))
-				draw_colored_polygon(PackedVector2Array([
-					head_pos + Vector2(w * 0.14, by2 - h * 0.06),
-					head_pos + Vector2(w * 0.02, by2),
-					head_pos + Vector2(w * 0.14, by2 + h * 0.06),
-				]), Color(0.85, 0.3, 0.45))
-				draw_circle(head_pos + Vector2(0, by2), w * 0.035, Color(0.7, 0.2, 0.35))
-
-	func _draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
-		var pts := PackedVector2Array()
-		var steps := 28
-		for i in range(steps):
-			var a := TAU * i / steps
-			pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
-		draw_colored_polygon(pts, color)
+		if face_texture:
+			draw_texture_rect(face_texture, Rect2(Vector2.ZERO, size), false)
 
 
 # ============================================================
@@ -298,10 +211,10 @@ func _build_ui() -> void:
 	coins_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_area.add_child(coins_layer)
 
-	# кот-корзина (увеличен размер до 130x115)
+	# Кот-корзина (теперь отображает только мордочку)
 	basket = MiniPet.new()
-	basket.custom_minimum_size = Vector2(260, 230)
-	basket.size = Vector2(260, 230)
+	basket.custom_minimum_size = Vector2(180, 160)
+	basket.size = Vector2(180, 160)
 	basket.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_area.add_child(basket)
 
@@ -433,7 +346,6 @@ func _spawn_coin() -> void:
 	var coin := Coin.new()
 	var idx := randi() % COIN_COLORS.size()
 	coin.color = COIN_COLORS[idx]
-	# увеличен радиус монеты до 22–28 px (было 14–20 px)
 	coin.radius = randf_range(44.0, 56.0)
 	coin.symbol = ""
 	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE

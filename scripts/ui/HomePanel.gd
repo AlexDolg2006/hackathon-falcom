@@ -112,10 +112,12 @@ func _build_ui() -> void:
 	pet_card.add_theme_stylebox_override("panel", pet_card_style)
 	root_vb.add_child(pet_card)
 
-	var pet_canvas := Control.new()
-	pet_canvas.set_script(load("res://scripts/ui/PetCanvas.gd"))
-	pet_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pet_card.add_child(pet_canvas)
+	var cat_view := Control.new()
+	cat_view.set_script(load("res://scripts/ui/CatView.gd"))
+	cat_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cat_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cat_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pet_card.add_child(cat_view)
 
 	# --- 3. КНОПКИ БЫСТРЫХ ДЕЙСТВИЙ ВНИЗУ ---
 	var actions_hb := HBoxContainer.new()
