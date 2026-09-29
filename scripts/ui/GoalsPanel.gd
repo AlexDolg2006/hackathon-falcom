@@ -71,7 +71,7 @@ func _build_ui() -> void:
 	var list_title := Label.new()
 	list_title.text = "Все финансовые цели:"
 	list_title.add_theme_font_size_override("font_size", 20)
-	list_title.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
+	list_title.add_theme_color_override("font_color", Color(1, 1, 1))
 	vb.add_child(list_title)
 
 	goals_list_box = VBoxContainer.new()

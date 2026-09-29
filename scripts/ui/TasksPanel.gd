@@ -49,6 +49,7 @@ func _build_ui() -> void:
 	title.text = "📋 Финансовые задания"
 	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD
 	top_vb.add_child(title)
 
 	var desc := Label.new()
@@ -94,7 +95,8 @@ func _build_topic_header(topic_tasks: Array) -> Control:
 	else:
 		header.text = "Задания"
 	header.add_theme_font_size_override("font_size", 20)
-	header.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
+	header.add_theme_color_override("font_color", Color(1, 1, 1))
+	header.autowrap_mode = TextServer.AUTOWRAP_WORD
 	return header
 
 
@@ -103,17 +105,18 @@ func _build_topic_header(topic_tasks: Array) -> Control:
 func _build_task_card(task: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Не задаем custom_minimum_size.y!
 
 	var is_completed: bool = _is_task_completed(task)
 	var card_style := StyleBoxFlat.new()
 	card_style.bg_color = Color(0.92, 0.96, 0.93) if is_completed else Color(0.95, 0.95, 0.98)
 	card_style.set_corner_radius_all(16)
-	card_style.shadow_size = 2
-	card_style.shadow_color = Color(0, 0, 0, 0.06)
-	card_style.content_margin_left = 12
-	card_style.content_margin_right = 12
-	card_style.content_margin_top = 10
-	card_style.content_margin_bottom = 10
+	
+	# Отступы внутри карточки сами зададут нужную высоту в зависимости от объема текста:
+	card_style.content_margin_left = 14
+	card_style.content_margin_right = 14
+	card_style.content_margin_top = 12
+	card_style.content_margin_bottom = 12
 	panel.add_theme_stylebox_override("panel", card_style)
 
 	var hb := HBoxContainer.new()
@@ -122,7 +125,8 @@ func _build_task_card(task: Dictionary) -> Control:
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
+	info.size_flags_vertical = Control.SIZE_EXPAND_FILL # Позволяет контейнеру расти вниз
+	info.add_theme_constant_override("separation", 4)
 	hb.add_child(info)
 
 	var title_lbl := Label.new()
@@ -136,13 +140,14 @@ func _build_task_card(task: Dictionary) -> Control:
 	desc_lbl.text = str(task.get("desc", task.get("scenario", "")))
 	desc_lbl.add_theme_font_size_override("font_size", 16)
 	desc_lbl.add_theme_color_override("font_color", Color(0.35, 0.35, 0.45))
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD # Обязательно для переноса текста
 	info.add_child(desc_lbl)
 
 	var reward_lbl := Label.new()
 	reward_lbl.text = "Награда: +%d монет 💰" % int(task.get("reward", 0))
 	reward_lbl.add_theme_font_size_override("font_size", 16)
 	reward_lbl.add_theme_color_override("font_color", Color(0.15, 0.55, 0.25))
+	reward_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	info.add_child(reward_lbl)
 
 	var open_btn := _create_pill_button(
@@ -150,7 +155,7 @@ func _build_task_card(task: Dictionary) -> Control:
 		Color(0.3, 0.65, 0.4) if is_completed else Color(0.42, 0.35, 0.82),
 		46
 	)
-	open_btn.custom_minimum_size = Vector2(170, 46)
+	open_btn.custom_minimum_size = Vector2(130, 46)
 	open_btn.pressed.connect(func(): _open_task(task))
 	hb.add_child(open_btn)
 
@@ -173,34 +178,40 @@ func _complete_task(id) -> void:
 func _open_task(t: Dictionary) -> void:
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
-	content.custom_minimum_size = Vector2(520, 0)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Карточка сценария
 	var scen_card := PanelContainer.new()
+	scen_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scen_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	
 	var scen_style := StyleBoxFlat.new()
 	scen_style.bg_color = Color(0.94, 0.94, 0.98)
 	scen_style.set_corner_radius_all(14)
-	scen_style.content_margin_left = 14
-	scen_style.content_margin_right = 14
-	scen_style.content_margin_top = 10
-	scen_style.content_margin_bottom = 10
+	# Отступы сами растолкают границы карточки под размер текста:
+	scen_style.content_margin_left = 12
+	scen_style.content_margin_right = 12
+	scen_style.content_margin_top = 12
+	scen_style.content_margin_bottom = 12
 	scen_card.add_theme_stylebox_override("panel", scen_style)
 	content.add_child(scen_card)
 
 	var scenario := Label.new()
 	scenario.text = str(t.get("scenario", ""))
 	scenario.autowrap_mode = TextServer.AUTOWRAP_WORD
-	scenario.add_theme_font_size_override("font_size", 17)
+	scenario.add_theme_font_size_override("font_size", 16)
 	scenario.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
+	scenario.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scen_card.add_child(scenario)
 
 	# Карточка фидбэка (появляется после ответа)
 	var fb_card := PanelContainer.new()
+	fb_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var fb_style := StyleBoxFlat.new()
 	fb_style.bg_color = Color(0.92, 0.96, 0.93)
 	fb_style.set_corner_radius_all(14)
-	fb_style.content_margin_left = 14
-	fb_style.content_margin_right = 14
+	fb_style.content_margin_left = 12
+	fb_style.content_margin_right = 12
 	fb_style.content_margin_top = 10
 	fb_style.content_margin_bottom = 10
 	fb_card.add_theme_stylebox_override("panel", fb_style)
@@ -209,8 +220,9 @@ func _open_task(t: Dictionary) -> void:
 
 	var feedback_lbl := Label.new()
 	feedback_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	feedback_lbl.add_theme_font_size_override("font_size", 16)
+	feedback_lbl.add_theme_font_size_override("font_size", 15)
 	feedback_lbl.add_theme_color_override("font_color", Color(0.15, 0.45, 0.2))
+	feedback_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fb_card.add_child(feedback_lbl)
 
 	# Кнопки
@@ -218,7 +230,6 @@ func _open_task(t: Dictionary) -> void:
 	var task_type: String = str(t.get("type", ""))
 
 	if task_type == "choice":
-		# Каждый вариант — отдельная кнопка
 		for opt in t.get("options", []):
 			var text := str(opt.get("text", ""))
 			buttons.append({
@@ -233,7 +244,6 @@ func _open_task(t: Dictionary) -> void:
 		buttons.append({ "text": "Закрыть", "color": UIUtils.NEUTRAL })
 
 	elif task_type == "input":
-		# Поля ввода в content, кнопка «Проверить» — без закрытия
 		var input_ctx := _build_input_fields(content, t)
 		var fb_lbl_local := feedback_lbl
 		var fb_card_local := fb_card
@@ -262,7 +272,6 @@ func _open_task(t: Dictionary) -> void:
 	UIUtils.show_custom(self, str(t.get("title", "Задание")), content, buttons)
 
 
-# Возвращает Dictionary с тремя SpinBox — чтобы можно было валидировать позже
 func _build_input_fields(content: VBoxContainer, t: Dictionary) -> Dictionary:
 	var total_hint: int = int(t.get("total_hint", 60))
 	var min_mandatory: int = int(t.get("min_mandatory", 20))
@@ -270,8 +279,9 @@ func _build_input_fields(content: VBoxContainer, t: Dictionary) -> Dictionary:
 	var hint := Label.new()
 	hint.text = "Всего монет: %d (обязательное — не менее %d)" % [total_hint, min_mandatory]
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
-	hint.add_theme_font_size_override("font_size", 16)
+	hint.add_theme_font_size_override("font_size", 15)
 	hint.add_theme_color_override("font_color", Color(0.35, 0.35, 0.45))
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_child(hint)
 
 	var mand_spin := SpinBox.new()
@@ -328,15 +338,22 @@ func _validate_input(t: Dictionary, ctx: Dictionary,
 
 
 func _labeled(control: Control, label_text: String) -> Control:
-	var hb := HBoxContainer.new()
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 2)
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
 	var l := Label.new()
 	l.text = label_text
-	l.custom_minimum_size = Vector2(140, 0)
-	l.add_theme_font_size_override("font_size", 16)
-	l.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
-	hb.add_child(l)
-	hb.add_child(control)
-	return hb
+	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_color_override("font_color", Color(1, 1, 1))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD
+	
+	control.custom_minimum_size.y = 40
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	vb.add_child(l)
+	vb.add_child(control)
+	return vb
 
 
 # ---------- СТИЛИЗОВАННАЯ КНОПКА ----------
@@ -344,5 +361,5 @@ func _labeled(control: Control, label_text: String) -> Control:
 func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	UIUtils.style_pill_button(btn, bg_color, height, 18)
+	UIUtils.style_pill_button(btn, bg_color, height, 16)
 	return btn

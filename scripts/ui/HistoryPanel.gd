@@ -63,7 +63,7 @@ func _build_ui() -> void:
 	var tips_title := Label.new()
 	tips_title.text = "💡 Финансовая шпаргалка:"
 	tips_title.add_theme_font_size_override("font_size", 20)
-	tips_title.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
+	tips_title.add_theme_color_override("font_color", Color(1, 1, 1))
 	vb.add_child(tips_title)
 
 	var tips := [

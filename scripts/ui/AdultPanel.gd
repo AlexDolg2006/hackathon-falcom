@@ -1,5 +1,7 @@
 extends Control
 
+const UIUtils = preload("res://scripts/ui/UIUtils.gd")
+
 var pin_entered := false
 var content_box: VBoxContainer
 
@@ -160,7 +162,7 @@ func _build_adult_settings() -> void:
 		l.add_theme_color_override("font_color", Color(0.25, 0.25, 0.35))
 		r_vb.add_child(l)
 
-	# 2. Кнопка выдачи монет (Первая вернувшаяся кнопка)
+	# 2. Выдать монеты
 	var add_coins_btn := _create_pill_button("➕ Выдать бонусные монеты (+50)", Color(0.22, 0.65, 0.35), 56)
 	add_coins_btn.pressed.connect(func():
 		GameData.wallet += 50
@@ -170,7 +172,7 @@ func _build_adult_settings() -> void:
 	)
 	content_box.add_child(add_coins_btn)
 
-	# 3. Кнопка заблокировать / выйти из родительского режима (Вторая вернувшаяся кнопка)
+	# 3. Заблокировать / выйти
 	var lock_btn := _create_pill_button("🔒 Выйти из режима родителя", Color(0.42, 0.35, 0.82), 56)
 	lock_btn.pressed.connect(func():
 		pin_entered = false
@@ -178,21 +180,27 @@ func _build_adult_settings() -> void:
 	)
 	content_box.add_child(lock_btn)
 
-	# 4. Сброс прогресса
+	# 4. Сброс прогресса с кратким кастомным диалогом
 	var reset_btn := _create_pill_button("⚠️ Сбросить весь прогресс (Начало заново)", Color(0.82, 0.3, 0.3), 56)
 	reset_btn.pressed.connect(func():
-		var confirm := ConfirmationDialog.new()
-		confirm.dialog_text = "Вы уверены, что хотите сбросить весь прогресс и вернуть стартовый экран?"
-		add_child(confirm)
-		confirm.confirmed.connect(func():
-			GameData.first_launch = true
-			GameData.pet_created = false
-			GameData.save_game()
-			get_tree().reload_current_scene()
+		UIUtils.show_confirm(
+			self,
+			"⚠️ Сброс игры",
+			"Вы уверены, что хотите полностью сбросить весь прогресс и заново пройти первый запуск?",
+			Callable(self, "_reset_all_progress"),
+			"Сбросить",
+			"Отмена",
+			Color(0.82, 0.3, 0.3)
 		)
-		confirm.popup_centered()
 	)
 	content_box.add_child(reset_btn)
+
+	# Полный сброс всех показателей
+func _reset_all_progress() -> void:
+	# Вызываем существующий метод сброса в синглтоне
+	GameData.reset_profile()
+	GameData.save_game()
+	get_tree().reload_current_scene()
 
 
 func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:

@@ -26,8 +26,8 @@ static func style_pill_button(btn: Button, bg_color: Color, height: int = 46, fo
 	style.shadow_size = 2
 	style.shadow_offset = Vector2(0, 2)
 	style.shadow_color = Color(0, 0, 0, 0.12)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
+	style.content_margin_left = 14
+	style.content_margin_right = 14
 	style.content_margin_top = 6
 	style.content_margin_bottom = 6
 
@@ -60,7 +60,7 @@ static func _make_overlay(parent: Control) -> Control:
 	return overlay
 
 
-static func _make_card(overlay: Control, min_width: int = 420) -> VBoxContainer:
+static func _make_card(overlay: Control, max_width: int = 420) -> VBoxContainer:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(center)
@@ -69,19 +69,24 @@ static func _make_card(overlay: Control, min_width: int = 420) -> VBoxContainer:
 	var style := StyleBoxFlat.new()
 	style.bg_color = BG
 	style.set_corner_radius_all(20)
-	style.content_margin_left = 22
-	style.content_margin_right = 22
-	style.content_margin_top = 20
-	style.content_margin_bottom = 20
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
 	style.shadow_size = 12
 	style.shadow_offset = Vector2(0, 6)
 	style.shadow_color = Color(0, 0, 0, 0.32)
 	card.add_theme_stylebox_override("panel", style)
-	card.custom_minimum_size = Vector2(min_width, 0)
+
+	# Адаптивный размер: подстраивается под экран телефона с отступами по 16px с краев
+	var viewport_w := overlay.get_viewport_rect().size.x
+	var target_w := minf(viewport_w - 32.0, float(max_width))
+	card.custom_minimum_size = Vector2(target_w, 0)
+
 	center.add_child(card)
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 14)
+	vb.add_theme_constant_override("separation", 12)
 	card.add_child(vb)
 
 	return vb
@@ -90,9 +95,9 @@ static func _make_card(overlay: Control, min_width: int = 420) -> VBoxContainer:
 static func _add_title(vb: VBoxContainer, text: String) -> void:
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_font_size_override("font_size", 20)
 	lbl.add_theme_color_override("font_color", TEXT)
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD # Автоматический перенос строк
 	vb.add_child(lbl)
 
 	var sep := HSeparator.new()
@@ -102,9 +107,9 @@ static func _add_title(vb: VBoxContainer, text: String) -> void:
 static func _make_msg_label(text: String) -> Label:
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 17)
+	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", SUBTLE)
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD # Автоматический перенос строк
 	return lbl
 
 
@@ -115,7 +120,7 @@ static func show_message(parent: Control, title: String, message: String,
 		ok_color: Color = ACCENT) -> Control:
 
 	var overlay := _make_overlay(parent)
-	var vb := _make_card(overlay, 420)
+	var vb := _make_card(overlay, 400)
 	_add_title(vb, title)
 	vb.add_child(_make_msg_label(message))
 
@@ -125,8 +130,8 @@ static func show_message(parent: Control, title: String, message: String,
 
 	var ok := Button.new()
 	ok.text = ok_text
-	ok.custom_minimum_size = Vector2(130, 44)
-	style_pill_button(ok, ok_color, 44, 17)
+	ok.custom_minimum_size = Vector2(110, 44)
+	style_pill_button(ok, ok_color, 44, 16)
 	ok.pressed.connect(func(): overlay.queue_free())
 	btn_row.add_child(ok)
 
@@ -142,26 +147,28 @@ static func show_confirm(parent: Control, title: String, message: String,
 		ok_color: Color = ACCENT) -> Control:
 
 	var overlay := _make_overlay(parent)
-	var vb := _make_card(overlay, 440)
+	var vb := _make_card(overlay, 400)
 	_add_title(vb, title)
 	vb.add_child(_make_msg_label(message))
 
 	var btn_row := HBoxContainer.new()
 	btn_row.alignment = BoxContainer.ALIGNMENT_END
-	btn_row.add_theme_constant_override("separation", 10)
+	btn_row.add_theme_constant_override("separation", 8)
 	vb.add_child(btn_row)
 
 	var cancel := Button.new()
 	cancel.text = cancel_text
-	cancel.custom_minimum_size = Vector2(130, 44)
-	style_pill_button(cancel, NEUTRAL, 44, 17)
+	cancel.custom_minimum_size = Vector2(110, 44)
+	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	style_pill_button(cancel, NEUTRAL, 44, 16)
 	cancel.pressed.connect(func(): overlay.queue_free())
 	btn_row.add_child(cancel)
 
 	var ok := Button.new()
 	ok.text = ok_text
-	ok.custom_minimum_size = Vector2(130, 44)
-	style_pill_button(ok, ok_color, 44, 17)
+	ok.custom_minimum_size = Vector2(110, 44)
+	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	style_pill_button(ok, ok_color, 44, 16)
 	ok.pressed.connect(func():
 		overlay.queue_free()
 		if on_confirm.is_valid():
@@ -174,28 +181,37 @@ static func show_confirm(parent: Control, title: String, message: String,
 
 # ---------- 3. Произвольное содержимое ----------
 
-# buttons: массив словарей вида
-#   { "text": String, "color": Color, "on_press": Callable, "close": bool = true }
-# "close": false — оставить окно открытым после нажатия (для кнопки «Проверить»).
 static func show_custom(parent: Control, title: String, content: Control,
 		buttons: Array) -> Control:
 
 	var overlay := _make_overlay(parent)
-	var vb := _make_card(overlay, 480)
+	var vb := _make_card(overlay, 400)
 	_add_title(vb, title)
-	vb.add_child(content)
+
+	# Ограничиваем высоту контента и включаем прокрутку, если текста очень много
+	# Замените жесткую привязку высоты скролла:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 150 # Задаём только минимальную высоту, чтобы окно не сжималось в ноль
+	
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content)
+	vb.add_child(scroll)
 
 	if buttons.size() > 0:
-		var btn_row := HBoxContainer.new()
-		btn_row.alignment = BoxContainer.ALIGNMENT_END
-		btn_row.add_theme_constant_override("separation", 10)
-		vb.add_child(btn_row)
+		var btn_container := VBoxContainer.new() # Вертикальная стопка кнопок для надежности на телефонах
+		btn_container.add_theme_constant_override("separation", 8)
+		vb.add_child(btn_container)
 
 		for b in buttons:
 			var btn := Button.new()
 			btn.text = str(b.get("text", "OK"))
-			btn.custom_minimum_size = Vector2(130, 44)
-			style_pill_button(btn, b.get("color", ACCENT), 44, 17)
+			btn.custom_minimum_size = Vector2(0, 46)
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			style_pill_button(btn, b.get("color", ACCENT), 46, 16)
 
 			var cb: Callable = b.get("on_press", Callable())
 			var do_close: bool = b.get("close", true)
@@ -206,11 +222,11 @@ static func show_custom(parent: Control, title: String, content: Control,
 				if do_close:
 					overlay.queue_free()
 			)
-			btn_row.add_child(btn)
+			btn_container.add_child(btn)
 
 	return overlay
-	
-	# Полупрозрачное затемнение фона под попапом (используется в Main.gd)
+
+
 static func make_dim_overlay(color: Color = Color(0, 0, 0, 0.35)) -> ColorRect:
 	var rect := ColorRect.new()
 	rect.color = color

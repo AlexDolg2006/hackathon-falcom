@@ -631,3 +631,20 @@ func mood_face() -> String:
 		return "neutral"
 	else:
 		return "sad"
+		
+## Глобальный масштаб UI (1.0 — стандарт, 1.2 — крупный, 1.4 — очень крупный)
+var ui_scale: float = 1.0
+
+## Функция для расчёта размера шрифта
+func get_font_size(base_size: int) -> int:
+	return int(round(base_size * ui_scale))
+
+## Функция для расчёта размеров блоков и кнопок (высота, минимальные размеры)
+func get_scaled_size(base_size: float) -> float:
+	return base_size * ui_scale
+
+## Изменение масштаба из любого места приложения
+func set_ui_scale(new_scale: float) -> void:
+	ui_scale = clampf(new_scale, 0.8, 2.0)
+	save_game()
+	state_changed.emit() # Перерисовывает все экраны

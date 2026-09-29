@@ -1,7 +1,7 @@
 extends Control
-## Мини-игра: лови монетки. Корзина — маленький кот с шапкой,
+## Мини-игра: лови монетки. Корзина — кот увеличенного размера с шапкой,
 ## которого можно двигать пальцем/мышью/стрелками.
-## Монеты — процедурные, с бликом и символом.
+## Монеты — процедурные увеличенные, с бликом и символом.
 
 const GAME_TIME := 20.0
 const SPAWN_INTERVAL := 0.65
@@ -15,7 +15,7 @@ const COIN_COLORS := [
 ]
 
 var play_area: Control
-var basket: Control         # теперь Control, а не ColorRect
+var basket: Control         # Control (MiniPet)
 var coins_layer: Control
 var time_label: Label
 var score_label: Label
@@ -33,7 +33,7 @@ var key_right := false
 
 
 # ============================================================
-#  МИНИ-КОТ (рисуется процедурно прямо в MiniGamePanel)
+#  МИНИ-КОТ (увеличен до 130x115 px)
 # ============================================================
 class MiniPet extends Control:
 	const BODY_COLORS := [
@@ -43,7 +43,7 @@ class MiniPet extends Control:
 	]
 
 	func _ready() -> void:
-		custom_minimum_size = Vector2(90, 80)
+		custom_minimum_size = Vector2(260, 230)
 
 	func _draw() -> void:
 		var w: float = size.x
@@ -97,14 +97,14 @@ class MiniPet extends Control:
 			head_pos + Vector2(0, h * 0.10),
 		]), Color(0.85, 0.45, 0.5))
 
-		# рот-«корзина» — широкая улыбка, в неё падают монетки
+		# рот-«корзина»
 		draw_arc(head_pos + Vector2(0, h * 0.10), w * 0.16,
 			0.15, PI - 0.15, 18, Color(0.35, 0.2, 0.2), 3.0)
-		# «лапки» — две точки внизу
+		# лапки
 		draw_circle(Vector2(cx - w * 0.18, h - h * 0.12), w * 0.06, base.darkened(0.05))
 		draw_circle(Vector2(cx + w * 0.18, h - h * 0.12), w * 0.06, base.darkened(0.05))
 
-		# шапка (если надета)
+		# шапка
 		_draw_hat(head_pos, w, h)
 
 	func _draw_hat(head_pos: Vector2, w: float, h: float) -> void:
@@ -162,10 +162,10 @@ class MiniPet extends Control:
 
 
 # ============================================================
-#  МОНЕТА (процедурная, с бликом и символом)
+#  МОНЕТА (процедурная)
 # ============================================================
 class Coin extends Control:
-	var radius: float = 16.0
+	var radius: float = 24.0
 	var color: Color = Color(1.0, 0.85, 0.25)
 	var symbol: String = "₽"
 	var _t: float = 0.0
@@ -186,10 +186,10 @@ class Coin extends Control:
 		# тело монеты
 		draw_circle(c, radius, color)
 		# тёмный ободок
-		draw_arc(c, radius - 1.5, 0, TAU, 28, color.darkened(0.35), 2.0)
+		draw_arc(c, radius - 1.5, 0, TAU, 28, color.darkened(0.35), 2.5)
 		# внутренний круг
-		draw_arc(c, radius - 5.0, 0, TAU, 24, color.lightened(0.25), 1.5)
-		# блик, который «бегает»
+		draw_arc(c, radius - 6.0, 0, TAU, 24, color.lightened(0.25), 2.0)
+		# блик
 		var blik_a := _t * 2.0
 		var blik_pos := c + Vector2(cos(blik_a) * radius * 0.35, sin(blik_a) * radius * 0.35)
 		draw_circle(blik_pos, radius * 0.18, Color(1, 1, 1, 0.55))
@@ -298,10 +298,10 @@ func _build_ui() -> void:
 	coins_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_area.add_child(coins_layer)
 
-	# кот-корзина
+	# кот-корзина (увеличен размер до 130x115)
 	basket = MiniPet.new()
-	basket.custom_minimum_size = Vector2(90, 80)
-	basket.size = Vector2(90, 80)
+	basket.custom_minimum_size = Vector2(260, 230)
+	basket.size = Vector2(260, 230)
 	basket.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_area.add_child(basket)
 
@@ -433,10 +433,10 @@ func _spawn_coin() -> void:
 	var coin := Coin.new()
 	var idx := randi() % COIN_COLORS.size()
 	coin.color = COIN_COLORS[idx]
-	coin.radius = randf_range(14.0, 20.0)
+	# увеличен радиус монеты до 22–28 px (было 14–20 px)
+	coin.radius = randf_range(44.0, 56.0)
 	coin.symbol = ""
 	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# пересчитаем размеры после задания радиуса
 	coin.custom_minimum_size = Vector2(coin.radius * 2, coin.radius * 2)
 	coin.size = Vector2(coin.radius * 2, coin.radius * 2)
 	var max_x: float = max(0.0, play_area.size.x - coin.size.x)

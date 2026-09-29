@@ -91,7 +91,7 @@ func _add_section(title_text: String, items: Array) -> void:
 	var header := Label.new()
 	header.text = title_text
 	header.add_theme_font_size_override("font_size", 20)
-	header.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
+	header.add_theme_color_override("font_color", Color(1, 1, 1))
 	list_box.add_child(header)
 
 	for it in items:
