@@ -1,0 +1,90 @@
+[
+  {
+	"id": "food_basic",
+	"name": "Корм",
+	"price": 10,
+	"category": "mandatory",
+	"desc": "Обычный корм для кота.",
+	"hunger": 25,
+	"mood": 0
+  },
+  {
+	"id": "food_tasty",
+	"name": "Вкусный корм",
+	"price": 18,
+	"category": "mandatory",
+	"desc": "Кот будет доволен.",
+	"hunger": 40,
+	"mood": 5
+  },
+  {
+	"id": "soap",
+	"name": "Мыло",
+	"price": 12,
+	"category": "mandatory",
+	"desc": "Нужно, чтобы помыть кота. Купи и используй в ванной.",
+	"hunger": 0,
+	"mood": 0,
+	"slot": "wash",
+	"wash_power": 12
+  },
+  {
+	"id": "sponge",
+	"name": "Мочалка",
+	"price": 20,
+	"category": "mandatory",
+	"desc": "Мягкая мочалка — мыть кота приятнее и быстрее.",
+	"hunger": 0,
+	"mood": 0,
+	"slot": "wash",
+	"wash_power": 20
+  },
+  {
+	"id": "hat_cap",
+	"name": "Кепка",
+	"price": 25,
+	"category": "optional",
+	"desc": "Стильная кепка для прогулок.",
+	"hunger": 0,
+	"mood": 8,
+	"slot": "hat"
+  },
+  {
+	"id": "hat_crown",
+	"name": "Корона",
+	"price": 45,
+	"category": "optional",
+	"desc": "Корона настоящего кота-мудреца.",
+	"hunger": 0,
+	"mood": 15,
+	"slot": "hat"
+  },
+  {
+	"id": "hat_bow",
+	"name": "Бантик",
+	"price": 30,
+	"category": "optional",
+	"desc": "Милый бантик.",
+	"hunger": 0,
+	"mood": 10,
+	"slot": "hat"
+  },
+  {
+	"id": "toy_ball",
+	"name": "Мячик",
+	"price": 15,
+	"category": "optional",
+	"desc": "Любимая игрушка.",
+	"hunger": 0,
+	"mood": 10
+  },
+  {
+	"id": "toy_mouse",
+	"name": "Игрушечная мышка",
+	"price": 22,
+	"category": "optional",
+	"desc": "Кот будет гоняться за ней.",
+	"hunger": 0,
+	"mood": 14
+  }
+]
