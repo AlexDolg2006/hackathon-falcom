@@ -1,6 +1,5 @@
 extends Node
 ## Центральное хранилище состояния игры "Питомец Финни".
-## Отвечает за экономику, состояние питомца, планы бюджета, цели, задания и сохранение.
 
 signal state_changed
 signal toast(message: String)
@@ -8,9 +7,11 @@ signal toast(message: String)
 const SAVE_PATH := "user://save_game.json"
 const PERIOD_LENGTH := 5
 const DAILY_INCOME := 25
-const SAVINGS_RATE := 0.05 # фиксированный процент на накопления за период
+const LOGIN_BONUS := 10
+const SAVINGS_RATE := 0.05
 const MINIGAME_REWARD_PER_COIN := 1
 
+# ---- контент ----
 var shop_items: Array = []
 var tasks: Array = []
 var goals_catalog: Array = []
@@ -23,13 +24,18 @@ var pet_name: String = "Финни"
 var body_color_index: int = 0
 var pattern_index: int = 0
 var equipped_hat: String = ""
-var pet_stage: int = 0 # 0..2
+var equipped_wash: String = ""
+var pet_stage: int = 0
 var growth_points: int = 0
 
 var mood: int = 80
 var hunger: int = 80
 
-var wallet: int = 60 # непристроенные монеты, ждут плана
+# ---- гигиена ----
+# 0..100. Растёт от купания, падает со временем.
+var hygiene: int = 60
+
+var wallet: int = 60
 var mandatory_budget: int = 0
 var optional_budget: int = 0
 var savings: int = 0
@@ -39,18 +45,28 @@ var current_goal_id: String = ""
 var period_active: bool = false
 var period_number: int = 1
 var day_in_period: int = 1
+
+# ---- флаг "период завершён, нужен новый план" ----
+# true, когда 5-й день закончился и до подтверждения нового плана
+# кнопка "Завершить текущий день" должна быть заблокирована.
+var plan_required: bool = false
+
+var plan_pct_mandatory: int = 50
+var plan_pct_optional: int = 30
+var plan_pct_savings: int = 20
+
 var plan_mandatory: int = 0
 var plan_optional: int = 0
 var plan_savings: int = 0
 var fact_mandatory: int = 0
 var fact_optional: int = 0
 
-var inventory: Dictionary = {} # item_id -> count owned (consumables and hats)
+var inventory: Dictionary = {}
 var completed_tasks: Array = []
-var history: Array = [] # период -> summary dict
-var purchase_log: Array = [] # текущий период: {name, price, category}
+var history: Array = []
+var purchase_log: Array = []
 
-var last_minigame_day_key: int = -1 # глобальный день, когда играли в мини-игру
+var last_minigame_day_key: int = -1
 var global_day_counter: int = 0
 var last_login_day_key: int = -1
 
@@ -100,10 +116,12 @@ func save_game() -> void:
 		"body_color_index": body_color_index,
 		"pattern_index": pattern_index,
 		"equipped_hat": equipped_hat,
+		"equipped_wash": equipped_wash,
 		"pet_stage": pet_stage,
 		"growth_points": growth_points,
 		"mood": mood,
 		"hunger": hunger,
+		"hygiene": hygiene,
 		"wallet": wallet,
 		"mandatory_budget": mandatory_budget,
 		"optional_budget": optional_budget,
@@ -112,6 +130,10 @@ func save_game() -> void:
 		"period_active": period_active,
 		"period_number": period_number,
 		"day_in_period": day_in_period,
+		"plan_required": plan_required,
+		"plan_pct_mandatory": plan_pct_mandatory,
+		"plan_pct_optional": plan_pct_optional,
+		"plan_pct_savings": plan_pct_savings,
 		"plan_mandatory": plan_mandatory,
 		"plan_optional": plan_optional,
 		"plan_savings": plan_savings,
@@ -145,10 +167,12 @@ func load_game() -> void:
 	body_color_index = d.get("body_color_index", 0)
 	pattern_index = d.get("pattern_index", 0)
 	equipped_hat = d.get("equipped_hat", "")
+	equipped_wash = d.get("equipped_wash", "")
 	pet_stage = d.get("pet_stage", 0)
 	growth_points = d.get("growth_points", 0)
 	mood = d.get("mood", 80)
 	hunger = d.get("hunger", 80)
+	hygiene = d.get("hygiene", 60)
 	wallet = d.get("wallet", 60)
 	mandatory_budget = d.get("mandatory_budget", 0)
 	optional_budget = d.get("optional_budget", 0)
@@ -157,6 +181,10 @@ func load_game() -> void:
 	period_active = d.get("period_active", false)
 	period_number = d.get("period_number", 1)
 	day_in_period = d.get("day_in_period", 1)
+	plan_required = d.get("plan_required", false)
+	plan_pct_mandatory = d.get("plan_pct_mandatory", 50)
+	plan_pct_optional = d.get("plan_pct_optional", 30)
+	plan_pct_savings = d.get("plan_pct_savings", 20)
 	plan_mandatory = d.get("plan_mandatory", 0)
 	plan_optional = d.get("plan_optional", 0)
 	plan_savings = d.get("plan_savings", 0)
@@ -179,10 +207,12 @@ func reset_profile(demo: bool = false) -> void:
 	body_color_index = 0
 	pattern_index = 0
 	equipped_hat = ""
+	equipped_wash = ""
 	pet_stage = 0
 	growth_points = 0
 	mood = 80
 	hunger = 80
+	hygiene = 60
 	wallet = 60
 	mandatory_budget = 0
 	optional_budget = 0
@@ -191,6 +221,10 @@ func reset_profile(demo: bool = false) -> void:
 	period_active = false
 	period_number = 1
 	day_in_period = 1
+	plan_required = false
+	plan_pct_mandatory = 50
+	plan_pct_optional = 30
+	plan_pct_savings = 20
 	plan_mandatory = 0
 	plan_optional = 0
 	plan_savings = 0
@@ -226,7 +260,37 @@ func create_pet(name: String, color_index: int, pattern: int) -> void:
 	state_changed.emit()
 
 
-# ---------------- ЕЖЕДНЕВНЫЙ ДОХОД ----------------
+# ---------------- РАСПРЕДЕЛЕНИЕ ДОХОДА ----------------
+
+func _distribute_income(amount: int) -> void:
+	if amount <= 0:
+		return
+	if not period_active:
+		wallet += amount
+		return
+	var m := int(floor(amount * plan_pct_mandatory / 100.0))
+	var o := int(floor(amount * plan_pct_optional / 100.0))
+	var s := amount - m - o
+	mandatory_budget += m
+	optional_budget += o
+	savings += s
+	plan_mandatory += m
+	plan_optional += o
+	plan_savings += s
+
+
+func _add_income(amount: int, source: String) -> void:
+	if amount <= 0:
+		return
+	if period_active:
+		_distribute_income(amount)
+	else:
+		wallet += amount
+	save_game()
+	state_changed.emit()
+
+
+# ---------------- ЕЖЕДНЕВНЫЙ ВХОД ----------------
 
 func can_claim_daily_income() -> bool:
 	return last_login_day_key != global_day_counter
@@ -235,11 +299,9 @@ func can_claim_daily_income() -> bool:
 func claim_daily_income() -> void:
 	if not can_claim_daily_income():
 		return
-	wallet += DAILY_INCOME
 	last_login_day_key = global_day_counter
-	toast.emit("Начислено %d монет: ежедневный вход" % DAILY_INCOME)
-	save_game()
-	state_changed.emit()
+	_add_income(LOGIN_BONUS, "бонус за вход")
+	toast.emit("Бонус за вход: +%d монет" % LOGIN_BONUS)
 
 
 # ---------------- МИНИ-ИГРА ----------------
@@ -250,31 +312,43 @@ func can_play_minigame() -> bool:
 
 func reward_minigame(coins_caught: int) -> void:
 	var reward := coins_caught * MINIGAME_REWARD_PER_COIN
-	wallet += reward
 	last_minigame_day_key = global_day_counter
-	toast.emit("Мини-игра: поймано %d монет!" % reward)
-	save_game()
-	state_changed.emit()
+	_add_income(reward, "мини-игра")
+	toast.emit("Мини-игра: +%d монет" % reward)
 
 
 # ---------------- ПЛАН БЮДЖЕТА ----------------
 
-func confirm_plan(mandatory: int, optional: int, save_amount: int) -> bool:
-	var total := mandatory + optional + save_amount
-	if total > wallet or mandatory < 0 or optional < 0 or save_amount < 0:
+func can_confirm_plan() -> bool:
+	## Можно подтверждать новый план, если период не активен.
+	return not period_active
+
+
+func confirm_plan(pct_m: int, pct_o: int, pct_s: int) -> bool:
+	if pct_m < 0 or pct_o < 0 or pct_s < 0:
 		return false
-	wallet -= total
-	mandatory_budget += mandatory
-	optional_budget += optional
-	savings += save_amount
-	plan_mandatory = mandatory
-	plan_optional = optional
-	plan_savings = save_amount
+	if pct_m + pct_o + pct_s != 100:
+		return false
+	if pct_m == 0:
+		return false
+	plan_pct_mandatory = pct_m
+	plan_pct_optional = pct_o
+	plan_pct_savings = pct_s
+	var start_amount := wallet
+	wallet = 0
+	mandatory_budget = 0
+	optional_budget = 0
+	plan_mandatory = 0
+	plan_optional = 0
+	plan_savings = 0
 	fact_mandatory = 0
 	fact_optional = 0
 	purchase_log = []
 	period_active = true
+	plan_required = false
 	day_in_period = 1
+	period_number = max(1, period_number)
+	_distribute_income(start_amount)
 	save_game()
 	state_changed.emit()
 	return true
@@ -295,9 +369,9 @@ func can_afford(item_id: String) -> Dictionary:
 		return {"ok": false, "reason": "Такого товара нет."}
 	var cat: String = item.get("category", "mandatory")
 	var price: int = item.get("price", 0)
-	var bucket := mandatory_budget if cat == "mandatory" else optional_budget
 	if not period_active:
-		return {"ok": false, "reason": "Сначала составь план бюджета на новый период."}
+		return {"ok": false, "reason": "Сначала составь план бюджета на вкладке «Бюджет»."}
+	var bucket := mandatory_budget if cat == "mandatory" else optional_budget
 	if bucket < price:
 		var label := "обязательное" if cat == "mandatory" else "желаемое"
 		return {"ok": false, "reason": "Не хватает %d монет в категории «%s». Сейчас доступно: %d." % [price - bucket, label, bucket]}
@@ -317,11 +391,19 @@ func buy_item(item_id: String) -> Dictionary:
 	else:
 		optional_budget -= price
 		fact_optional += price
-	hunger = clampi(hunger + int(item.get("hunger", 0)), 0, 100)
-	mood = clampi(mood + int(item.get("mood", 0)), 0, 100)
-	if item.has("slot") and item.get("slot") == "hat":
-		equipped_hat = item_id
-	inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+
+	var slot: String = item.get("slot", "")
+	if slot == "wash":
+		inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+		if equipped_wash == "":
+			equipped_wash = item_id
+	else:
+		hunger = clampi(hunger + int(item.get("hunger", 0)), 0, 100)
+		mood = clampi(mood + int(item.get("mood", 0)), 0, 100)
+		inventory[item_id] = int(inventory.get(item_id, 0)) + 1
+		if slot == "hat":
+			equipped_hat = item_id
+
 	purchase_log.append({"name": item.get("name"), "price": price, "category": cat})
 	toast.emit("Куплено: %s" % item.get("name"))
 	save_game()
@@ -340,6 +422,41 @@ func equip_hat(item_id: String) -> void:
 		equipped_hat = item_id
 		save_game()
 		state_changed.emit()
+
+
+func unequip_wash() -> void:
+	equipped_wash = ""
+	save_game()
+	state_changed.emit()
+
+
+func equip_wash(item_id: String) -> void:
+	if int(inventory.get(item_id, 0)) > 0:
+		equipped_wash = item_id
+		save_game()
+		state_changed.emit()
+
+
+func apply_wash_step(hygiene_gain: int) -> void:
+	## Вызывается из WashPanel при касании мокрым ведром тела кота.
+	if hygiene_gain <= 0:
+		return
+	hygiene = clampi(hygiene + hygiene_gain, 0, 100)
+	# настроение подрастает медленнее, чем гигиена
+	mood = clampi(mood + max(1, hygiene_gain / 4), 0, 100)
+	save_game()
+	state_changed.emit()
+
+
+func hygiene_stage() -> String:
+	if hygiene >= 70:
+		return "Чистый"
+	elif hygiene >= 40:
+		return "Немного грязный"
+	elif hygiene >= 20:
+		return "Грязный"
+	else:
+		return "Очень грязный"
 
 
 # ---------------- НАКОПЛЕНИЯ / ЦЕЛИ ----------------
@@ -402,28 +519,41 @@ func is_task_completed(task_id: String) -> bool:
 func complete_task(task_id: String, reward: int = 10) -> void:
 	if not is_task_completed(task_id):
 		completed_tasks.append(task_id)
-		wallet += reward
+		_add_income(reward, "задание")
 		toast.emit("Задание выполнено! +%d монет" % reward)
+		return
 	save_game()
 	state_changed.emit()
 
 
 # ---------------- ТЕЧЕНИЕ ДНЯ / ПЕРИОДА ----------------
 
+func can_advance_day() -> bool:
+	## Кнопка "Завершить текущий день" доступна только когда период активен.
+	## Если период завершён (plan_required = true) — сначала нужен новый план.
+	return period_active
+
+
 func advance_day() -> Dictionary:
-	## Возвращает summary если период завершился, иначе {}.
+	if not period_active:
+		# защита от двойного вызова
+		return {}
+
 	global_day_counter += 1
-	# естественное снижение показателей
+	_add_income(DAILY_INCOME, "ежедневный доход")
+
 	hunger = clampi(hunger - 18, 0, 100)
 	var mood_decay := 6
 	if hunger < 30:
 		mood_decay += 8
 	mood = clampi(mood - mood_decay, 0, 100)
 
-	if not period_active:
-		save_game()
-		state_changed.emit()
-		return {}
+	# Гигиена падает со временем. Но если кот чистый (>80) — медленно
+	# восстанавливается обратно к 100.
+	var hyg_decay := 10
+	if hunger < 30:
+		hyg_decay += 5
+	hygiene = clampi(hygiene - hyg_decay, 0, 100)
 
 	day_in_period += 1
 	if day_in_period > PERIOD_LENGTH:
@@ -462,18 +592,30 @@ func _close_period() -> Dictionary:
 		"new_stage": pet_stage,
 		"end_mood": mood,
 		"end_hunger": hunger,
+		"end_hygiene": hygiene,
 	}
 	history.append(summary)
 
-	# неизрасходованные монеты возвращаются в кошелёк для нового плана
 	wallet += mandatory_budget + optional_budget
 	mandatory_budget = 0
 	optional_budget = 0
 	period_active = false
+	plan_required = true
 	period_number += 1
 	day_in_period = 1
 	return summary
 
+
+# ---------------- ПАССИВНОЕ ВОССТАНОВЛЕНИЕ ГИГИЕНЫ ----------------
+
+func _process(_delta: float) -> void:
+	## Плавное пассивное восстановление гигиены до 100, если кот сыт и не болен.
+	## Раз в 5 секунд прибавляем 1 (очень медленно).
+	## Чтобы не будить UI каждый кадр — используем счётчик секунд.
+	pass
+
+
+# ---------------- ВСПОМОГАТЕЛЬНОЕ ДЛЯ ОТРИСОВКИ ----------------
 
 func stage_name() -> String:
 	match pet_stage:
@@ -489,3 +631,20 @@ func mood_face() -> String:
 		return "neutral"
 	else:
 		return "sad"
+		
+## Глобальный масштаб UI (1.0 — стандарт, 1.2 — крупный, 1.4 — очень крупный)
+var ui_scale: float = 1.0
+
+## Функция для расчёта размера шрифта
+func get_font_size(base_size: int) -> int:
+	return int(round(base_size * ui_scale))
+
+## Функция для расчёта размеров блоков и кнопок (высота, минимальные размеры)
+func get_scaled_size(base_size: float) -> float:
+	return base_size * ui_scale
+
+## Изменение масштаба из любого места приложения
+func set_ui_scale(new_scale: float) -> void:
+	ui_scale = clampf(new_scale, 0.8, 2.0)
+	save_game()
+	state_changed.emit() # Перерисовывает все экраны

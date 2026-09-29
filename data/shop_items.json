@@ -1,11 +1,90 @@
 [
-  {"id":"food_milk","name":"Молоко","category":"mandatory","price":10,"icon":"food","hunger":15,"mood":0,"desc":"Простой перекус, немного насыщает."},
-  {"id":"food_fish","name":"Рыбка","category":"mandatory","price":18,"icon":"food","hunger":30,"mood":2,"desc":"Любимая еда котика, хорошо насыщает."},
-  {"id":"food_chicken","name":"Курочка","category":"mandatory","price":28,"icon":"food","hunger":45,"mood":5,"desc":"Сытный обед надолго."},
-  {"id":"soap_basic","name":"Мыло","category":"mandatory","price":12,"icon":"soap","hunger":0,"mood":10,"desc":"Помыть котика и поднять настроение."},
-  {"id":"soap_shampoo","name":"Шампунь с ромашкой","category":"mandatory","price":22,"icon":"soap","hunger":0,"mood":16,"desc":"Пахнет цветами, котик доволен."},
-  {"id":"hat_bow","name":"Бантик","category":"optional","price":20,"icon":"hat_bow","hunger":0,"mood":8,"desc":"Милый бантик для настроения.","slot":"hat"},
-  {"id":"hat_cap","name":"Кепка","category":"optional","price":35,"icon":"hat_cap","hunger":0,"mood":10,"desc":"Стильная кепка.","slot":"hat"},
-  {"id":"hat_crown","name":"Корона","category":"optional","price":70,"icon":"hat_crown","hunger":0,"mood":18,"desc":"Королевская корона для особого настроения.","slot":"hat"},
-  {"id":"toy_ball","name":"Клубок ниток","category":"optional","price":15,"icon":"toy","hunger":0,"mood":9,"desc":"Игрушка поднимает настроение."}
+  {
+	"id": "food_basic",
+	"name": "Корм",
+	"price": 10,
+	"category": "mandatory",
+	"desc": "Обычный корм для кота.",
+	"hunger": 25,
+	"mood": 0
+  },
+  {
+	"id": "food_tasty",
+	"name": "Вкусный корм",
+	"price": 18,
+	"category": "mandatory",
+	"desc": "Кот будет доволен.",
+	"hunger": 40,
+	"mood": 5
+  },
+  {
+	"id": "soap",
+	"name": "Мыло",
+	"price": 12,
+	"category": "mandatory",
+	"desc": "Нужно, чтобы помыть кота. Купи и используй в ванной.",
+	"hunger": 0,
+	"mood": 0,
+	"slot": "wash",
+	"wash_power": 12
+  },
+  {
+	"id": "sponge",
+	"name": "Мочалка",
+	"price": 20,
+	"category": "mandatory",
+	"desc": "Мягкая мочалка — мыть кота приятнее и быстрее.",
+	"hunger": 0,
+	"mood": 0,
+	"slot": "wash",
+	"wash_power": 20
+  },
+  {
+	"id": "hat_cap",
+	"name": "Кепка",
+	"price": 25,
+	"category": "optional",
+	"desc": "Стильная кепка для прогулок.",
+	"hunger": 0,
+	"mood": 8,
+	"slot": "hat"
+  },
+  {
+	"id": "hat_crown",
+	"name": "Корона",
+	"price": 45,
+	"category": "optional",
+	"desc": "Корона настоящего кота-мудреца.",
+	"hunger": 0,
+	"mood": 15,
+	"slot": "hat"
+  },
+  {
+	"id": "hat_bow",
+	"name": "Бантик",
+	"price": 30,
+	"category": "optional",
+	"desc": "Милый бантик.",
+	"hunger": 0,
+	"mood": 10,
+	"slot": "hat"
+  },
+  {
+	"id": "toy_ball",
+	"name": "Мячик",
+	"price": 15,
+	"category": "optional",
+	"desc": "Любимая игрушка.",
+	"hunger": 0,
+	"mood": 10
+  },
+  {
+	"id": "toy_mouse",
+	"name": "Игрушечная мышка",
+	"price": 22,
+	"category": "optional",
+	"desc": "Кот будет гоняться за ней.",
+	"hunger": 0,
+	"mood": 14
+  }
 ]
