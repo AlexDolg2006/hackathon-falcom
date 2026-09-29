@@ -1,5 +1,7 @@
 extends Control
 
+const UIUtils = preload("res://scripts/ui/UIUtils.gd")
+
 var tasks_container: VBoxContainer
 
 
@@ -56,7 +58,6 @@ func _build_ui() -> void:
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	top_vb.add_child(desc)
 
-	# --- Контейнер для заданий ---
 	tasks_container = VBoxContainer.new()
 	tasks_container.add_theme_constant_override("separation", 10)
 	tasks_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -124,7 +125,6 @@ func _build_task_card(task: Dictionary) -> Control:
 	info.add_theme_constant_override("separation", 3)
 	hb.add_child(info)
 
-	# Заголовок + метка «✓ выполнено»
 	var title_lbl := Label.new()
 	title_lbl.text = str(task.get("title", "")) + ("  ✓ выполнено" if is_completed else "")
 	title_lbl.add_theme_font_size_override("font_size", 19)
@@ -132,7 +132,6 @@ func _build_task_card(task: Dictionary) -> Control:
 	title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	info.add_child(title_lbl)
 
-	# Описание (desc или scenario)
 	var desc_lbl := Label.new()
 	desc_lbl.text = str(task.get("desc", task.get("scenario", "")))
 	desc_lbl.add_theme_font_size_override("font_size", 16)
@@ -140,14 +139,12 @@ func _build_task_card(task: Dictionary) -> Control:
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	info.add_child(desc_lbl)
 
-	# Награда
 	var reward_lbl := Label.new()
 	reward_lbl.text = "Награда: +%d монет 💰" % int(task.get("reward", 0))
 	reward_lbl.add_theme_font_size_override("font_size", 16)
 	reward_lbl.add_theme_color_override("font_color", Color(0.15, 0.55, 0.25))
 	info.add_child(reward_lbl)
 
-	# Кнопка открытия диалога
 	var open_btn := _create_pill_button(
 		"Пройти ещё раз" if is_completed else "Открыть задание",
 		Color(0.3, 0.65, 0.4) if is_completed else Color(0.42, 0.35, 0.82),
@@ -173,19 +170,12 @@ func _complete_task(id) -> void:
 
 # ---------- ДИАЛОГ ЗАДАНИЯ ----------
 
-const UIUtils = preload("res://scripts/ui/UIUtils.gd")
-
 func _open_task(t: Dictionary) -> void:
-	var dialog := AcceptDialog.new()
-	dialog.title = str(t.get("title", "Задание"))
-	dialog.ok_button_text = "Закрыть"
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	content.custom_minimum_size = Vector2(520, 0)
 
-	var vb := VBoxContainer.new()
-	vb.custom_minimum_size = Vector2(520, 0)
-	vb.add_theme_constant_override("separation", 10)
-	dialog.add_child(vb)
-
-	# --- Карточка сценария ---
+	# Карточка сценария
 	var scen_card := PanelContainer.new()
 	var scen_style := StyleBoxFlat.new()
 	scen_style.bg_color = Color(0.94, 0.94, 0.98)
@@ -195,7 +185,7 @@ func _open_task(t: Dictionary) -> void:
 	scen_style.content_margin_top = 10
 	scen_style.content_margin_bottom = 10
 	scen_card.add_theme_stylebox_override("panel", scen_style)
-	vb.add_child(scen_card)
+	content.add_child(scen_card)
 
 	var scenario := Label.new()
 	scenario.text = str(t.get("scenario", ""))
@@ -204,7 +194,7 @@ func _open_task(t: Dictionary) -> void:
 	scenario.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
 	scen_card.add_child(scenario)
 
-	# --- Карточка фидбэка ---
+	# Карточка фидбэка (появляется после ответа)
 	var fb_card := PanelContainer.new()
 	var fb_style := StyleBoxFlat.new()
 	fb_style.bg_color = Color(0.92, 0.96, 0.93)
@@ -215,7 +205,7 @@ func _open_task(t: Dictionary) -> void:
 	fb_style.content_margin_bottom = 10
 	fb_card.add_theme_stylebox_override("panel", fb_style)
 	fb_card.visible = false
-	vb.add_child(fb_card)
+	content.add_child(fb_card)
 
 	var feedback_lbl := Label.new()
 	feedback_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -223,132 +213,119 @@ func _open_task(t: Dictionary) -> void:
 	feedback_lbl.add_theme_color_override("font_color", Color(0.15, 0.45, 0.2))
 	fb_card.add_child(feedback_lbl)
 
+	# Кнопки
+	var buttons: Array = []
 	var task_type: String = str(t.get("type", ""))
+
 	if task_type == "choice":
-		_build_choice_ui(vb, t, feedback_lbl, fb_card)
+		# Каждый вариант — отдельная кнопка
+		for opt in t.get("options", []):
+			var text := str(opt.get("text", ""))
+			buttons.append({
+				"text": text,
+				"color": UIUtils.ACCENT,
+				"close": false,
+				"on_press": func():
+					fb_card.visible = true
+					feedback_lbl.text = str(opt.get("feedback", ""))
+					_complete_task(t.get("id"))
+			})
+		buttons.append({ "text": "Закрыть", "color": UIUtils.NEUTRAL })
+
 	elif task_type == "input":
-		_build_input_ui(vb, t, feedback_lbl, fb_card)
+		# Поля ввода в content, кнопка «Проверить» — без закрытия
+		var input_ctx := _build_input_fields(content, t)
+		var fb_lbl_local := feedback_lbl
+		var fb_card_local := fb_card
+
+		buttons.append({
+			"text": "Проверить",
+			"color": UIUtils.ACCENT,
+			"close": false,
+			"on_press": func():
+				_validate_input(t, input_ctx, fb_card_local, fb_lbl_local)
+		})
+		buttons.append({ "text": "Закрыть", "color": UIUtils.NEUTRAL })
+
 	else:
-		var claim := _create_pill_button("Забрать", Color(0.22, 0.65, 0.35), 46)
-		vb.add_child(claim)
-		claim.pressed.connect(func():
-			fb_card.visible = true
-			feedback_lbl.text = "Задание засчитано! +%d монет 💰" % int(t.get("reward", 0))
-			_complete_task(t.get("id"))
-			claim.disabled = true
-		)
+		buttons.append({
+			"text": "Забрать",
+			"color": UIUtils.SUCCESS,
+			"close": false,
+			"on_press": func():
+				fb_card.visible = true
+				feedback_lbl.text = "Задание засчитано! +%d монет 💰" % int(t.get("reward", 0))
+				_complete_task(t.get("id"))
+		})
+		buttons.append({ "text": "Закрыть", "color": UIUtils.NEUTRAL })
 
-	add_child(dialog)
-	UIUtils.style_dialog(dialog, Color(0.42, 0.35, 0.82))
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
-	dialog.popup_centered(Vector2i(580, 520))
-
-# ---------- ТИП "choice" ----------
-
-func _build_choice_ui(vb: VBoxContainer, t: Dictionary, feedback_lbl: Label, fb_card: PanelContainer) -> void:
-	for opt in t.get("options", []):
-		var btn := Button.new()
-		btn.text = str(opt.get("text", ""))
-		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
-		btn.custom_minimum_size = Vector2(0, 46)
-
-		# Кнопки вариантов — в стиле app: мягкий фон + подсветка
-		var b_style := StyleBoxFlat.new()
-		b_style.bg_color = Color(0.91, 0.92, 0.97)
-		b_style.set_corner_radius_all(14)
-		b_style.content_margin_left = 14
-		b_style.content_margin_right = 14
-		b_style.content_margin_top = 8
-		b_style.content_margin_bottom = 8
-
-		var b_hover := b_style.duplicate() as StyleBoxFlat
-		b_hover.bg_color = Color(0.42, 0.35, 0.82)
-
-		btn.add_theme_stylebox_override("normal", b_style)
-		btn.add_theme_stylebox_override("hover", b_hover)
-		btn.add_theme_stylebox_override("focus", b_hover)
-		btn.add_theme_stylebox_override("pressed", b_hover)
-		btn.add_theme_font_size_override("font_size", 16)
-		btn.add_theme_color_override("font_color", Color(0.2, 0.2, 0.3))
-		btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
-
-		vb.add_child(btn)
-		btn.pressed.connect(func():
-			fb_card.visible = true
-			feedback_lbl.text = str(opt.get("feedback", ""))
-			_complete_task(t.get("id"))
-			for c in vb.get_children():
-				if c is Button:
-					c.disabled = true
-		)
+	UIUtils.show_custom(self, str(t.get("title", "Задание")), content, buttons)
 
 
-func _build_input_ui(vb: VBoxContainer, t: Dictionary, feedback_lbl: Label, fb_card: PanelContainer) -> void:
+# Возвращает Dictionary с тремя SpinBox — чтобы можно было валидировать позже
+func _build_input_fields(content: VBoxContainer, t: Dictionary) -> Dictionary:
 	var total_hint: int = int(t.get("total_hint", 60))
 	var min_mandatory: int = int(t.get("min_mandatory", 20))
 
-	# Хинт в стиле карточки
-	var hint_card := PanelContainer.new()
-	var hint_style := StyleBoxFlat.new()
-	hint_style.bg_color = Color(0.94, 0.94, 0.98)
-	hint_style.set_corner_radius_all(14)
-	hint_style.content_margin_left = 12
-	hint_style.content_margin_right = 12
-	hint_style.content_margin_top = 8
-	hint_style.content_margin_bottom = 8
-	hint_card.add_theme_stylebox_override("panel", hint_style)
-	vb.add_child(hint_card)
-
 	var hint := Label.new()
-	hint.text = "Всего монет для распределения: %d (обязательное — не менее %d)" % [total_hint, min_mandatory]
+	hint.text = "Всего монет: %d (обязательное — не менее %d)" % [total_hint, min_mandatory]
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.add_theme_font_size_override("font_size", 16)
-	hint.add_theme_color_override("font_color", Color(0.3, 0.3, 0.4))
-	hint_card.add_child(hint)
+	hint.add_theme_color_override("font_color", Color(0.35, 0.35, 0.45))
+	content.add_child(hint)
 
 	var mand_spin := SpinBox.new()
 	mand_spin.min_value = 0
 	mand_spin.max_value = total_hint
 	mand_spin.value = min_mandatory
-	vb.add_child(_labeled(mand_spin, "Обязательное"))
+	content.add_child(_labeled(mand_spin, "Обязательное"))
 
 	var opt_spin := SpinBox.new()
 	opt_spin.min_value = 0
 	opt_spin.max_value = total_hint
-	vb.add_child(_labeled(opt_spin, "Желаемое"))
+	content.add_child(_labeled(opt_spin, "Желаемое"))
 
 	var sav_spin := SpinBox.new()
 	sav_spin.min_value = 0
 	sav_spin.max_value = total_hint
-	vb.add_child(_labeled(sav_spin, "Накопления"))
+	content.add_child(_labeled(sav_spin, "Накопления"))
 
-	var submit := _create_pill_button("Проверить", Color(0.42, 0.35, 0.82), 46)
-	vb.add_child(submit)
+	return {
+		"mand": mand_spin,
+		"opt": opt_spin,
+		"sav": sav_spin,
+		"total_hint": total_hint,
+		"min_mandatory": min_mandatory,
+	}
 
-	submit.pressed.connect(func():
-		fb_card.visible = true
-		var total := int(mand_spin.value + opt_spin.value + sav_spin.value)
 
-		if total > total_hint:
-			feedback_lbl.add_theme_color_override("font_color", Color(0.7, 0.25, 0.25))
-			feedback_lbl.text = "Сумма превышает доступные монеты. Попробуй ещё раз."
-		elif int(mand_spin.value) < min_mandatory:
-			feedback_lbl.add_theme_color_override("font_color", Color(0.75, 0.5, 0.1))
-			feedback_lbl.text = "На обязательное отложено меньше %d монет — может не хватить на еду. %s" % [
-				min_mandatory, str(t.get("explanation", ""))
-			]
-		else:
-			feedback_lbl.add_theme_color_override("font_color", Color(0.15, 0.45, 0.2))
-			feedback_lbl.text = "Отлично! План устойчивый. %s" % str(t.get("explanation", ""))
-			_complete_task(t.get("id"))
-			submit.disabled = true
-			mand_spin.editable = false
-			opt_spin.editable = false
-			sav_spin.editable = false
-	)
+func _validate_input(t: Dictionary, ctx: Dictionary,
+		fb_card: PanelContainer, feedback_lbl: Label) -> void:
+	var mand_spin: SpinBox = ctx["mand"]
+	var opt_spin: SpinBox = ctx["opt"]
+	var sav_spin: SpinBox = ctx["sav"]
+	var total_hint: int = ctx["total_hint"]
+	var min_mandatory: int = ctx["min_mandatory"]
 
-# ---------- ТИП "input" ----------
+	fb_card.visible = true
+	var total := int(mand_spin.value + opt_spin.value + sav_spin.value)
+
+	if total > total_hint:
+		feedback_lbl.add_theme_color_override("font_color", Color(0.7, 0.25, 0.25))
+		feedback_lbl.text = "Сумма превышает доступные монеты. Попробуй ещё раз."
+	elif int(mand_spin.value) < min_mandatory:
+		feedback_lbl.add_theme_color_override("font_color", Color(0.75, 0.5, 0.1))
+		feedback_lbl.text = "На обязательное отложено меньше %d монет — может не хватить на еду. %s" % [
+			min_mandatory, str(t.get("explanation", ""))
+		]
+	else:
+		feedback_lbl.add_theme_color_override("font_color", Color(0.15, 0.45, 0.2))
+		feedback_lbl.text = "Отлично! План устойчивый. %s" % str(t.get("explanation", ""))
+		_complete_task(t.get("id"))
+		mand_spin.editable = false
+		opt_spin.editable = false
+		sav_spin.editable = false
+
 
 func _labeled(control: Control, label_text: String) -> Control:
 	var hb := HBoxContainer.new()
@@ -356,6 +333,7 @@ func _labeled(control: Control, label_text: String) -> Control:
 	l.text = label_text
 	l.custom_minimum_size = Vector2(140, 0)
 	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
 	hb.add_child(l)
 	hb.add_child(control)
 	return hb
@@ -366,28 +344,5 @@ func _labeled(control: Control, label_text: String) -> Control:
 func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.add_theme_font_size_override("font_size", 18)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1))
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.set_corner_radius_all(height / 2)
-	style.shadow_size = 2
-	style.shadow_offset = Vector2(0, 2)
-	style.shadow_color = Color(0, 0, 0, 0.12)
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-
-	var style_hover := style.duplicate() as StyleBoxFlat
-	style_hover.bg_color = bg_color.lightened(0.12)
-
-	var style_disabled := style.duplicate() as StyleBoxFlat
-	style_disabled.bg_color = Color(0.7, 0.7, 0.75, 0.7)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style_hover)
-	btn.add_theme_stylebox_override("focus", style_hover)
-	btn.add_theme_stylebox_override("pressed", style_hover)
-	btn.add_theme_stylebox_override("disabled", style_disabled)
-
+	UIUtils.style_pill_button(btn, bg_color, height, 18)
 	return btn

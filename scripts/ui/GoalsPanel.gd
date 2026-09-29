@@ -1,5 +1,7 @@
 extends Control
 
+const UIUtils = preload("res://scripts/ui/UIUtils.gd")
+
 var current_goal_card: PanelContainer
 var goals_list_box: VBoxContainer
 var savings_label: Label
@@ -58,21 +60,18 @@ func _build_ui() -> void:
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD
 	top_vb.add_child(subtitle)
 
-	# Общий счётчик накоплений (из второго файла)
 	savings_label = Label.new()
 	savings_label.add_theme_font_size_override("font_size", 19)
 	savings_label.add_theme_color_override("font_color", Color(0.2, 0.45, 0.25))
 	top_vb.add_child(savings_label)
 
-	# --- Карточка активной цели ---
 	current_goal_card = PanelContainer.new()
 	vb.add_child(current_goal_card)
 
-	# --- Заголовок списка ---
 	var list_title := Label.new()
 	list_title.text = "Все финансовые цели:"
 	list_title.add_theme_font_size_override("font_size", 20)
-	list_title.add_theme_color_override("font_color", Color(1, 1, 1))
+	list_title.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
 	vb.add_child(list_title)
 
 	goals_list_box = VBoxContainer.new()
@@ -85,7 +84,6 @@ func _build_ui() -> void:
 
 func _refresh() -> void:
 	savings_label.text = "Всего в накоплениях: %d монет" % GameData.savings
-
 	_refresh_current_goal_card()
 	_refresh_goals_list()
 
@@ -140,10 +138,8 @@ func _refresh_current_goal_card() -> void:
 	stat.add_theme_color_override("font_color", Color(0.2, 0.45, 0.25))
 	active_vb.add_child(stat)
 
-	# Прогноз сроков достижения цели (из второго файла)
 	active_vb.add_child(_build_estimate_label(g))
 
-	# Кнопка «Снять часть накоплений» (из второго файла)
 	var btn_row := HBoxContainer.new()
 	active_vb.add_child(btn_row)
 
@@ -182,8 +178,6 @@ func _refresh_goals_list() -> void:
 		goals_list_box.add_child(_build_goal_item(item))
 
 
-# ---------- КАРТОЧКА ЦЕЛИ В СПИСКЕ ----------
-
 func _build_goal_item(goal: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -212,7 +206,6 @@ func _build_goal_item(goal: Dictionary) -> Control:
 	info_vb.add_theme_constant_override("separation", 2)
 	hb.add_child(info_vb)
 
-	# Заголовок с ★-меткой для текущей цели (из второго файла)
 	var star := "  ★ текущая цель" if is_current else ""
 	var title_lbl := Label.new()
 	title_lbl.text = "%s %s — %d монет%s" % [
@@ -229,7 +222,6 @@ func _build_goal_item(goal: Dictionary) -> Control:
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	info_vb.add_child(desc_lbl)
 
-	# Прогресс-бар в каждой карточке (из второго файла, но в стиле первого)
 	var cost: int = goal.get("cost", 0)
 	if cost > 0:
 		var bar := ProgressBar.new()
@@ -244,7 +236,6 @@ func _build_goal_item(goal: Dictionary) -> Control:
 		progress_lbl.add_theme_color_override("font_color", Color(0.4, 0.4, 0.5))
 		info_vb.add_child(progress_lbl)
 
-	# Кнопка выбора / метка «Выбрана»
 	var select_btn := _create_pill_button(
 		"Выбрана" if is_current else "Выбрать",
 		Color(0.3, 0.65, 0.4) if is_current else Color(0.42, 0.35, 0.82),
@@ -260,81 +251,75 @@ func _build_goal_item(goal: Dictionary) -> Control:
 
 # ---------- ДИАЛОГ СНЯТИЯ НАКОПЛЕНИЙ ----------
 
-const UIUtils = preload("res://scripts/ui/UIUtils.gd")
-
 func _open_withdraw_dialog() -> void:
-	var dialog := ConfirmationDialog.new()
-	dialog.title = "Снять накопления"
-	dialog.ok_button_text = "Снять"
-	dialog.cancel_button_text = "Отмена"
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	content.custom_minimum_size = Vector2(400, 0)
 
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	vb.custom_minimum_size = Vector2(380, 0)
-
-	# Стилизованное пояснение в карточке
+	# Карточка с пояснением
 	var info_card := PanelContainer.new()
 	var info_style := StyleBoxFlat.new()
 	info_style.bg_color = Color(0.94, 0.94, 0.98)
 	info_style.set_corner_radius_all(14)
-	info_style.content_margin_left = 12
-	info_style.content_margin_right = 12
+	info_style.content_margin_left = 14
+	info_style.content_margin_right = 14
 	info_style.content_margin_top = 10
 	info_style.content_margin_bottom = 10
 	info_card.add_theme_stylebox_override("panel", info_style)
-	vb.add_child(info_card)
+	content.add_child(info_card)
+
+	var info_lbl := Label.new()
+	info_lbl.text = "Сейчас накоплено: %d монет.\nСнятые монеты попадут в кошелёк." % GameData.savings
+	info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	info_lbl.add_theme_font_size_override("font_size", 16)
+	info_lbl.add_theme_color_override("font_color", Color(0.3, 0.3, 0.4))
+	info_card.add_child(info_lbl)
+
+	# Строка «Сумма: [SpinBox]»
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	content.add_child(row)
 
 	var lbl := Label.new()
-	lbl.text = "Сколько монет снять с накоплений?\nСейчас: %d монет.\nСнятые монеты попадут в кошелёк." % GameData.savings
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", Color(0.25, 0.25, 0.35))
-	info_card.add_child(lbl)
-
-	var spin_row := HBoxContainer.new()
-	spin_row.add_theme_constant_override("separation", 10)
-	vb.add_child(spin_row)
-
-	var spin_lbl := Label.new()
-	spin_lbl.text = "Сумма:"
-	spin_lbl.add_theme_font_size_override("font_size", 17)
-	spin_lbl.add_theme_color_override("font_color", Color(0.2, 0.2, 0.3))
-	spin_row.add_child(spin_lbl)
+	lbl.text = "Сумма:"
+	lbl.add_theme_font_size_override("font_size", 17)
+	lbl.add_theme_color_override("font_color", Color(0.15, 0.15, 0.25))
+	row.add_child(lbl)
 
 	var spin := SpinBox.new()
 	spin.min_value = 0
 	spin.max_value = GameData.savings
 	spin.step = 1
 	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spin_row.add_child(spin)
+	row.add_child(spin)
 
 	var preview := Label.new()
-	preview.add_theme_font_size_override("font_size", 16)
-	preview.add_theme_color_override("font_color", Color(0.2, 0.45, 0.25))
 	preview.text = "После снятия останется: %d монет" % GameData.savings
-	vb.add_child(preview)
+	preview.add_theme_font_size_override("font_size", 16)
+	preview.add_theme_color_override("font_color", UIUtils.SUCCESS)
+	content.add_child(preview)
 
 	spin.value_changed.connect(func(v):
 		preview.text = "После снятия останется: %d монет" % (GameData.savings - int(v))
 	)
 
-	dialog.add_child(vb)
-	add_child(dialog)
-	UIUtils.style_dialog(dialog, Color(0.75, 0.45, 0.35), Color(0.62, 0.58, 0.72))
-
-	dialog.confirmed.connect(func():
+	# Лямбда подтверждения вынесена в переменную:
+	# GDScript не любит многострочные лямбды прямо в словаре.
+	var on_confirm := func() -> void:
 		if GameData.has_method("withdraw_savings"):
 			GameData.withdraw_savings(int(spin.value))
-	)
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
 
-	dialog.popup_centered(Vector2i(460, 300))
+	var buttons := [
+		{ "text": "Отмена", "color": UIUtils.NEUTRAL },
+		{ "text": "Снять", "color": UIUtils.DANGER, "on_press": on_confirm }
+	]
+
+	UIUtils.show_custom(self, "Снять накопления", content, buttons)
+
 
 # ---------- ХЕЛПЕРЫ ДОСТУПА К ДАННЫМ ----------
 
 func _get_goals_catalog() -> Array:
-	# Предпочитаем явный каталог из GameData, как во втором файле
 	if GameData.get("goals_catalog") != null:
 		return GameData.get("goals_catalog")
 	if GameData.get("goals") != null:
@@ -356,11 +341,9 @@ func _get_goal_by_id(id) -> Dictionary:
 
 
 func _select_goal(id) -> void:
-	# Предпочитаем инкапсулированный метод select_goal (из второго файла)
 	if GameData.has_method("select_goal"):
 		GameData.select_goal(id)
 	else:
-		# Резервный путь, как в первом файле
 		GameData.current_goal_id = id
 		if GameData.has_method("save_game"):
 			GameData.save_game()
@@ -372,28 +355,5 @@ func _select_goal(id) -> void:
 func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.add_theme_font_size_override("font_size", 18)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1))
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.set_corner_radius_all(height / 2)
-	style.shadow_size = 2
-	style.shadow_offset = Vector2(0, 2)
-	style.shadow_color = Color(0, 0, 0, 0.12)
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-
-	var style_hover := style.duplicate() as StyleBoxFlat
-	style_hover.bg_color = bg_color.lightened(0.12)
-
-	var style_disabled := style.duplicate() as StyleBoxFlat
-	style_disabled.bg_color = Color(0.7, 0.7, 0.75, 0.7)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style_hover)
-	btn.add_theme_stylebox_override("focus", style_hover)
-	btn.add_theme_stylebox_override("pressed", style_hover)
-	btn.add_theme_stylebox_override("disabled", style_disabled)
-
+	UIUtils.style_pill_button(btn, bg_color, height, 18)
 	return btn

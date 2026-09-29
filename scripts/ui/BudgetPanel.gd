@@ -1,5 +1,7 @@
 extends Control
 
+const UIUtils = preload("res://scripts/ui/UIUtils.gd")
+
 var wallet_label: Label
 var mandatory_slider: HSlider
 var optional_slider: HSlider
@@ -11,6 +13,7 @@ var remaining_label: Label
 var confirm_button: Button
 var day_advance: Button
 var status_box: VBoxContainer
+
 
 func _ready() -> void:
 	_build_ui()
@@ -66,7 +69,7 @@ func _build_ui() -> void:
 	status_box.add_theme_constant_override("separation", 4)
 	top_vb.add_child(status_box)
 
-	# --- 2. Карточка с настройкой процентов (Слайдеры) ---
+	# --- 2. Карточка со слайдерами ---
 	var form_card := PanelContainer.new()
 	var form_style := StyleBoxFlat.new()
 	form_style.bg_color = Color(0.95, 0.95, 0.98)
@@ -84,7 +87,6 @@ func _build_ui() -> void:
 	form.add_theme_constant_override("separation", 10)
 	form_card.add_child(form)
 
-	# Обязательное
 	form.add_child(_row_title("🍎 Обязательное (еда, уход)"))
 	mandatory_slider = _create_styled_slider()
 	mandatory_slider.value = GameData.plan_pct_mandatory
@@ -93,7 +95,6 @@ func _build_ui() -> void:
 	mandatory_value = _create_val_label()
 	form.add_child(mandatory_value)
 
-	# Желаемое
 	form.add_child(_row_title("🧸 Желаемое (шапки, игрушки)"))
 	optional_slider = _create_styled_slider()
 	optional_slider.value = GameData.plan_pct_optional
@@ -102,7 +103,6 @@ func _build_ui() -> void:
 	optional_value = _create_val_label()
 	form.add_child(optional_value)
 
-	# Накопления
 	form.add_child(_row_title("🎯 Накопления (+%d%% за период)" % int(GameData.SAVINGS_RATE * 100)))
 	savings_slider = _create_styled_slider()
 	savings_slider.value = GameData.plan_pct_savings
@@ -146,7 +146,7 @@ func _create_styled_slider() -> HSlider:
 	slider.min_value = 0
 	slider.max_value = 100
 	slider.step = 1
-	slider.custom_minimum_size = Vector2(0, 48) # Увеличенный размер для комфортного нажатия
+	slider.custom_minimum_size = Vector2(0, 48)
 	return slider
 
 
@@ -154,28 +154,7 @@ func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
 	btn.custom_minimum_size = Vector2(0, height)
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1))
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.set_corner_radius_all(height / 2)
-	style.shadow_size = 2
-	style.shadow_offset = Vector2(0, 2)
-	style.shadow_color = Color(0, 0, 0, 0.15)
-
-	var style_hover := style.duplicate() as StyleBoxFlat
-	style_hover.bg_color = bg_color.lightened(0.12)
-
-	var style_disabled := style.duplicate() as StyleBoxFlat
-	style_disabled.bg_color = Color(0.7, 0.7, 0.75, 0.7)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style_hover)
-	btn.add_theme_stylebox_override("focus", style_hover)
-	btn.add_theme_stylebox_override("pressed", style_hover)
-	btn.add_theme_stylebox_override("disabled", style_disabled)
-
+	UIUtils.style_pill_button(btn, bg_color, height, 20)
 	return btn
 
 
@@ -266,13 +245,36 @@ func _update_values() -> void:
 		if not GameData.period_active:
 			confirm_button.disabled = true
 
+
+func _on_confirm() -> void:
+	var m := int(mandatory_slider.value)
+	var o := int(optional_slider.value)
+	var s := int(savings_slider.value)
+	if m + o + s != 100:
+		UIUtils.show_message(self, "Проверь проценты",
+			"Сумма процентов должна быть ровно 100.")
+		return
+	if m == 0:
+		UIUtils.show_message(self, "Подожди",
+			"Обязательное направление стоит заполнить хотя бы немного — иначе не на что будет кормить котика.")
+		return
+
+	UIUtils.show_confirm(self, "Подтвердить план",
+		"Обязательное: %d%%\nЖелаемое: %d%%\nНакопления: %d%%\n\nПлан нельзя менять до конца периода." % [m, o, s],
+		func(): GameData.confirm_plan(m, o, s),
+		"Подтвердить", "Отмена",
+		UIUtils.SUCCESS)
+
+
 func _on_advance_day() -> void:
 	if not GameData.can_advance_day():
-		_show_message("Сначала план", "Период завершён — подтверди новый план бюджета, чтобы продолжить.")
+		UIUtils.show_message(self, "Сначала план",
+			"Период завершён — подтверди новый план бюджета, чтобы продолжить.")
 		return
 	var summary := GameData.advance_day()
 	if summary.is_empty():
-		_show_message("День завершён", "Наступил новый день. Пришло %d монет — не забудь покормить и помыть котика!" % GameData.DAILY_INCOME)
+		UIUtils.show_message(self, "День завершён",
+			"Наступил новый день. Пришло %d монет — не забудь покормить и помыть котика!" % GameData.DAILY_INCOME)
 	else:
 		var txt := "Период %d завершён!\n\nПлан (за период): обяз. %d / желаем. %d / накопл. %d\nФакт: обяз. %d / желаем. %d\nПроцент на накопления: +%d монет\n" % [
 			summary.get("period_number"), summary.get("plan_mandatory"), summary.get("plan_optional"), summary.get("plan_savings"),
@@ -284,37 +286,4 @@ func _on_advance_day() -> void:
 		else:
 			txt += "\nВ следующий раз попробуй лучше обеспечить обязательное и настроение котика."
 		txt += "\n\nТеперь составь новый план на вкладке «Бюджет»."
-		_show_message("Итоги периода", txt)
-
-
-const UIUtils = preload("res://scripts/ui/UIUtils.gd")
-
-func _show_message(title: String, text: String) -> void:
-	var d := AcceptDialog.new()
-	d.title = title
-	d.dialog_text = text
-	add_child(d)
-	UIUtils.style_dialog(d, Color(0.42, 0.35, 0.82))
-	d.popup_centered(Vector2i(440, 220))
-
-
-func _on_confirm() -> void:
-	var m := int(mandatory_slider.value)
-	var o := int(optional_slider.value)
-	var s := int(savings_slider.value)
-	if m + o + s != 100:
-		_show_message("Проверь проценты", "Сумма процентов должна быть ровно 100.")
-		return
-	if m == 0:
-		_show_message("Подожди", "Обязательное направление стоит заполнить хотя бы немного — иначе не на что будет кормить котика.")
-		return
-
-	var confirm := ConfirmationDialog.new()
-	confirm.title = "Подтвердить план"
-	confirm.dialog_text = "Обязательное: %d%%\nЖелаемое: %d%%\nНакопления: %d%%\n\nПлан нельзя менять до конца периода." % [m, o, s]
-	confirm.ok_button_text = "Подтвердить"
-	confirm.cancel_button_text = "Отмена"
-	add_child(confirm)
-	UIUtils.style_dialog(confirm, Color(0.22, 0.65, 0.35), Color(0.62, 0.58, 0.72))
-	confirm.confirmed.connect(func(): GameData.confirm_plan(m, o, s))
-	confirm.popup_centered(Vector2i(440, 240))
+		UIUtils.show_message(self, "Итоги периода", txt)

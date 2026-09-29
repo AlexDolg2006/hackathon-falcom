@@ -1,5 +1,7 @@
 extends Control
 
+const UIUtils = preload("res://scripts/ui/UIUtils.gd")
+
 var list_box: VBoxContainer
 var budget_label: Label
 
@@ -89,7 +91,7 @@ func _add_section(title_text: String, items: Array) -> void:
 	var header := Label.new()
 	header.text = title_text
 	header.add_theme_font_size_override("font_size", 20)
-	header.add_theme_color_override("font_color", Color(1, 1, 1))
+	header.add_theme_color_override("font_color", Color(0.2, 0.2, 0.32))
 	list_box.add_child(header)
 
 	for it in items:
@@ -119,7 +121,6 @@ func _build_item_row(item: Dictionary) -> Control:
 	hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(hb)
 
-	# --- Информационная часть ---
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -164,14 +165,13 @@ func _build_item_row(item: Dictionary) -> Control:
 		owned_lbl.add_theme_color_override("font_color", Color(0.4, 0.4, 0.5))
 		info.add_child(owned_lbl)
 
-	# --- Кнопки действий ---
 	var buttons := VBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)
 	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hb.add_child(buttons)
 
 	if slot == "hat" and owned > 0:
-		var is_worn :bool = GameData.equipped_hat == item.get("id")
+		var is_worn: bool = GameData.equipped_hat == item.get("id")
 		var wear_btn := _create_pill_button("Надеть" if not is_worn else "Снять", Color(0.55, 0.40, 0.80), 42)
 		wear_btn.custom_minimum_size = Vector2(130, 42)
 		wear_btn.pressed.connect(func():
@@ -201,61 +201,25 @@ func _build_item_row(item: Dictionary) -> Control:
 func _create_pill_button(text: String, bg_color: Color, height: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.add_theme_font_size_override("font_size", 18)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1))
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.set_corner_radius_all(height / 2)
-	style.shadow_size = 2
-	style.shadow_offset = Vector2(0, 2)
-	style.shadow_color = Color(0, 0, 0, 0.12)
-
-	var style_hover := style.duplicate() as StyleBoxFlat
-	style_hover.bg_color = bg_color.lightened(0.12)
-
-	var style_disabled := style.duplicate() as StyleBoxFlat
-	style_disabled.bg_color = Color(0.7, 0.7, 0.75, 0.7)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style_hover)
-	btn.add_theme_stylebox_override("focus", style_hover)
-	btn.add_theme_stylebox_override("pressed", style_hover)
-	btn.add_theme_stylebox_override("disabled", style_disabled)
-
+	UIUtils.style_pill_button(btn, bg_color, height, 18)
 	return btn
-
-
-const UIUtils = preload("res://scripts/ui/UIUtils.gd")
-
-func _show_message(title: String, text: String) -> void:
-	var d := AcceptDialog.new()
-	d.title = title
-	d.dialog_text = text
-	add_child(d)
-	UIUtils.style_dialog(d, Color(0.42, 0.35, 0.82))
-	d.popup_centered(Vector2i(440, 220))
 
 
 func _on_buy_pressed(item: Dictionary) -> void:
 	var check := GameData.can_afford(item.get("id"))
 	if not check.get("ok"):
-		_show_message("Покупка недоступна", str(check.get("reason")))
+		UIUtils.show_message(self, "Покупка недоступна", str(check.get("reason")))
 		return
 
-	var confirm := ConfirmationDialog.new()
-	confirm.title = "Покупка"
-	confirm.dialog_text = "Купить «%s» за %d монет?\nКатегория: %s" % [
-		item.get("name"), item.get("price"),
-		("обязательное" if item.get("category") == "mandatory" else "желаемое")
-	]
-	confirm.ok_button_text = "Купить"
-	confirm.cancel_button_text = "Отмена"
-	add_child(confirm)
-	UIUtils.style_dialog(confirm, Color(0.22, 0.65, 0.35), Color(0.62, 0.58, 0.72))
-	confirm.confirmed.connect(func():
-		var res := GameData.buy_item(item.get("id"))
-		if not res.get("ok"):
-			_show_message("Не получилось", str(res.get("reason")))
-	)
-	confirm.popup_centered(Vector2i(460, 220))
+	var item_id = item.get("id")
+	UIUtils.show_confirm(self, "Покупка",
+		"Купить «%s» за %d монет?\nКатегория: %s" % [
+			item.get("name"), item.get("price"),
+			("обязательное" if item.get("category") == "mandatory" else "желаемое")
+		],
+		func():
+			var res := GameData.buy_item(item_id)
+			if not res.get("ok"):
+				UIUtils.show_message(self, "Не получилось", str(res.get("reason"))),
+		"Купить", "Отмена",
+		UIUtils.SUCCESS)
