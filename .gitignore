@@ -1,14 +1,21 @@
+# сборки и подпись
 *.apk
 *.aab
+*.idsig
 *.jks
 *.keystore
 keystore.properties
 local.properties
+export_credentials.cfg
+# архивы с копиями проекта
+*.zip
+# Godot
+.godot/
+.import/
+*.translation
+# среды разработки
 .gradle/
 build/
 .idea/
 *.iml
 .DS_Store
-.godot/
-*.import
-*.translation
